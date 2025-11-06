@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8.15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build
+        run: pnpm build
+
+      - name: Run linting
+        run: pnpm lint
+
+      - name: Run unit tests
+        run: pnpm test
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        run: supabase start
+        env:
+          SUPABASE_DB_PASSWORD: postgres
+
+      - name: Wait for Supabase to be ready
+        run: |
+          timeout 120 bash -c 'until supabase status 2>/dev/null | grep -q "API URL"; do echo "Waiting for Supabase..."; sleep 3; done'
+          echo "Supabase is ready"
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:54322/postgres
+        run: pnpm test:integration
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop

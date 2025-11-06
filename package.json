@@ -1,0 +1,78 @@
+{
+  "name": "rls-dsl",
+  "version": "0.1.0",
+  "description": "TypeScript DSL for defining Row Level Security policies - works in Node.js, Deno, Bun, and browsers",
+  "packageManager": "pnpm@8.15.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src tests",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "VITEST_INTEGRATION=1 vitest run",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "test:integration:full": "bash scripts/run-integration-tests.sh",
+    "prepublishOnly": "pnpm build && pnpm test"
+  },
+  "keywords": [
+    "rls",
+    "row-level-security",
+    "postgresql",
+    "supabase",
+    "dsl",
+    "typescript",
+    "database",
+    "security",
+    "policies",
+    "sql",
+    "node",
+    "deno",
+    "bun",
+    "browser"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/rls-dsl.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/rls-dsl/issues"
+  },
+  "homepage": "https://github.com/yourusername/rls-dsl#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.0",
+    "@types/uuid": "^10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "@vitest/coverage-v8": "^4.0.8",
+    "eslint": "^9.39.1",
+    "pg": "^8.11.3",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.46.3",
+    "uuid": "^10.0.0",
+    "vitest": "^4.0.8"
+  }
+}
