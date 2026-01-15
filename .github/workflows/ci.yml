@@ -48,8 +48,10 @@ jobs:
 
       - name: Wait for Supabase to be ready
         run: |
-          timeout 120 bash -c 'until supabase status 2>/dev/null | grep -q "API URL"; do echo "Waiting for Supabase..."; sleep 3; done'
-          echo "Supabase is ready"
+          echo "Waiting for Supabase to start (may take several minutes on first run)..."
+          timeout 300 bash -c 'until supabase status 2>/dev/null | grep -q "API URL"; do echo "Waiting for Supabase..."; sleep 5; done'
+          echo "Supabase is ready!"
+          supabase status
 
       - name: Run integration tests
         env:
