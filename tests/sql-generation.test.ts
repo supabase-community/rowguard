@@ -1720,4 +1720,153 @@ describe("RLS DSL SQL Generation Tests", () => {
       expect(sql).toContain("idx_posts_author_id");
     });
   });
+
+  describe("User-Focused API", () => {
+    test("read() method - alias for SELECT", () => {
+      const expected =
+        "CREATE POLICY read_docs ON documents FOR SELECT USING (user_id = auth.uid())";
+
+      const policy = createPolicy("read_docs")
+        .on("documents")
+        .read()
+        .when(column("user_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("write() method - alias for INSERT", () => {
+      const expected =
+        "CREATE POLICY write_docs ON documents FOR INSERT WITH CHECK (user_id = auth.uid())";
+
+      const policy = createPolicy("write_docs")
+        .on("documents")
+        .write()
+        .allow(column("user_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("update() method - alias for UPDATE", () => {
+      const expected =
+        "CREATE POLICY update_docs ON documents FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid())";
+
+      const policy = createPolicy("update_docs")
+        .on("documents")
+        .update()
+        .allow(column("user_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("delete() method - alias for DELETE", () => {
+      const expected =
+        "CREATE POLICY delete_docs ON documents FOR DELETE USING (user_id = auth.uid())";
+
+      const policy = createPolicy("delete_docs")
+        .on("documents")
+        .delete()
+        .when(column("user_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("all() method - alias for ALL", () => {
+      const expected =
+        "CREATE POLICY all_docs ON documents FOR ALL USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid())";
+
+      const policy = createPolicy("all_docs")
+        .on("documents")
+        .all()
+        .allow(column("user_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("requireAll() method - alias for restrictive()", () => {
+      const expected =
+        "CREATE POLICY restrictive_policy ON data AS RESTRICTIVE FOR ALL USING (tenant_id = 1)";
+
+      const policy = createPolicy("restrictive_policy")
+        .on("data")
+        .all()
+        .requireAll()
+        .when(column("tenant_id").eq(1));
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("allowAny() method - alias for permissive()", () => {
+      const expected =
+        "CREATE POLICY permissive_policy ON data FOR SELECT USING (user_id = auth.uid())";
+
+      const policy = createPolicy("permissive_policy")
+        .on("data")
+        .read()
+        .allowAny()
+        .when(column("user_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("User-focused API with allow() method", () => {
+      const expected =
+        "CREATE POLICY read_policy ON posts FOR SELECT USING (user_id = auth.uid())";
+
+      const policy = createPolicy("read_policy")
+        .on("posts")
+        .read()
+        .allow(column("user_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("User-focused API chaining - read with requireAll", () => {
+      const expected =
+        "CREATE POLICY tenant_read ON tenant_data AS RESTRICTIVE FOR SELECT USING (tenant_id = current_setting('app.current_tenant_id', true)::INTEGER)";
+
+      const policy = createPolicy("tenant_read")
+        .on("tenant_data")
+        .read()
+        .requireAll()
+        .when(column("tenant_id").belongsToTenant());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("User-focused API - write with allow()", () => {
+      const expected =
+        "CREATE POLICY write_policy ON posts FOR INSERT WITH CHECK (user_id = auth.uid())";
+
+      const policy = createPolicy("write_policy")
+        .on("posts")
+        .write()
+        .allow(column("user_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("User-focused API - update with allow()", () => {
+      const expected =
+        "CREATE POLICY update_policy ON posts FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid())";
+
+      const policy = createPolicy("update_policy")
+        .on("posts")
+        .update()
+        .allow(column("user_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+
+    test("User-focused API - all operations with allow()", () => {
+      const expected =
+        "CREATE POLICY full_access ON resources FOR ALL USING (owner_id = auth.uid()) WITH CHECK (owner_id = auth.uid())";
+
+      const policy = createPolicy("full_access")
+        .on("resources")
+        .all()
+        .allow(column("owner_id").isOwner());
+
+      expect(normalizeSQL(policy.toSQL())).toBe(normalizeSQL(expected));
+    });
+  });
 });

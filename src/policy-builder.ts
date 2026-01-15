@@ -316,6 +316,41 @@ export class PolicyBuilder {
   }
 
   /**
+   * User-focused alias for .for("SELECT") - allows reading rows
+   */
+  read(): this {
+    return this.for("SELECT");
+  }
+
+  /**
+   * User-focused alias for .for("INSERT") - allows creating rows
+   */
+  write(): this {
+    return this.for("INSERT");
+  }
+
+  /**
+   * User-focused alias for .for("UPDATE") - allows updating rows
+   */
+  update(): this {
+    return this.for("UPDATE");
+  }
+
+  /**
+   * User-focused alias for .for("DELETE") - allows deleting rows
+   */
+  delete(): this {
+    return this.for("DELETE");
+  }
+
+  /**
+   * User-focused alias for .for("ALL") - allows all operations
+   */
+  all(): this {
+    return this.for("ALL");
+  }
+
+  /**
    * Specify the role this policy applies to
    */
   to(role: string): this {
@@ -349,7 +384,7 @@ export class PolicyBuilder {
     const operation = this.state.operation;
 
     if (!operation) {
-      throw new Error("Must call .for() before .allow()");
+      throw new Error("Must call .for(), .read(), .write(), .update(), .delete(), or .all() before .allow()");
     }
 
     const normalizedCondition = normalizeCondition(condition);
@@ -385,6 +420,20 @@ export class PolicyBuilder {
   permissive(): this {
     this.state.type = "PERMISSIVE";
     return this;
+  }
+
+  /**
+   * User-focused alias for .restrictive() - all policies must pass
+   */
+  requireAll(): this {
+    return this.restrictive();
+  }
+
+  /**
+   * User-focused alias for .permissive() - any policy can grant access
+   */
+  allowAny(): this {
+    return this.permissive();
   }
 
   /**

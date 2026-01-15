@@ -22,16 +22,16 @@ npm install rls-dsl
 ```typescript
 import { createPolicy, column, auth, from } from 'rls-dsl';
 
-// Simple user ownership
+// Simple user ownership (using user-focused API)
 const policy = createPolicy('user_documents')
   .on('documents')
-  .for('SELECT')
+  .read()
   .when(column('user_id').eq(auth.uid()));
 
 // Complex conditions with method chaining
 const complexPolicy = createPolicy('project_access')
   .on('projects')
-  .for('SELECT')
+  .read()
   .when(
     column('is_public').eq(true)
       .or(column('user_id').eq(auth.uid()))
@@ -41,7 +41,7 @@ const complexPolicy = createPolicy('project_access')
 // Subqueries
 const memberPolicy = createPolicy('member_access')
   .on('projects')
-  .for('SELECT')
+  .read()
   .when(
     column('id').in(
       from('project_members')
@@ -64,6 +64,30 @@ const publicPolicy = policies.publicAccess('projects');
 ```
 
 
+## User-Focused vs RLS-Focused API
+
+This library provides two API styles:
+
+**User-Focused API (Recommended)** - Uses intuitive terms like `read()`, `write()`, `update()`, `requireAll()`:
+```typescript
+createPolicy('user_docs')
+  .on('documents')
+  .read()           // Instead of .for('SELECT')
+  .requireAll()      // Instead of .restrictive()
+  .when(column('user_id').isOwner());
+```
+
+**RLS-Focused API** - Uses PostgreSQL RLS terminology like `for('SELECT')`, `restrictive()`:
+```typescript
+createPolicy('user_docs')
+  .on('documents')
+  .for('SELECT')     // RLS terminology
+  .restrictive()     // RLS terminology
+  .when(column('user_id').isOwner());
+```
+
+Both APIs are fully supported and produce identical SQL. The user-focused API is recommended for better readability and developer experience.
+
 ## API Reference
 
 ### Policy Builder
@@ -71,12 +95,22 @@ const publicPolicy = policies.publicAccess('projects');
 ```typescript
 createPolicy(name)
   .on(table)                    // Target table
+  .read()                       // User-focused: allow reading (SELECT)
+  .write()                      // User-focused: allow creating (INSERT)
+  .update()                     // User-focused: allow updating (UPDATE)
+  .delete()                     // User-focused: allow deleting (DELETE)
+  .all()                        // User-focused: allow all operations (ALL)
+  // Or use RLS-focused API:
   .for(operation)               // SELECT | INSERT | UPDATE | DELETE | ALL
   .to(role?)                    // Optional role restriction
   .when(condition)              // USING clause (read filter)
   .allow(condition)             // Type-safe USING/WITH CHECK based on operation
   .withCheck(condition)         // WITH CHECK clause (write validation)
+  .requireAll()                 // User-focused: all policies must pass (RESTRICTIVE)
+  .allowAny()                   // User-focused: any policy can grant access (PERMISSIVE, default)
+  // Or use RLS-focused API:
   .restrictive()                // Mark as RESTRICTIVE
+  .permissive()                 // Mark as PERMISSIVE (default)
   .description(text)            // Add documentation
   .toSQL()                      // Generate PostgreSQL statement
 ```
@@ -153,9 +187,10 @@ policies.roleAccess(table, role, operations?)
 Automatically generate indexes for RLS performance optimization:
 
 ```typescript
+// User-focused API (recommended)
 const policy = createPolicy('user_documents')
   .on('documents')
-  .for('SELECT')
+  .read()
   .when(column('user_id').eq(auth.uid()));
 
 const sql = policy.toSQL({ includeIndexes: true });
@@ -168,28 +203,37 @@ Indexes are created for columns in equality comparisons, IN clauses, and subquer
 ### User Ownership
 
 ```typescript
+// User-focused API (recommended)
 createPolicy('user_documents')
   .on('documents')
-  .for('SELECT')
+  .read()
   .when(column('user_id').eq(auth.uid()));
+
+// Or using .allow() for automatic USING/WITH CHECK handling
+createPolicy('user_documents')
+  .on('documents')
+  .read()
+  .allow(column('user_id').isOwner());
 ```
 
 ### Multi-Tenant Isolation
 
 ```typescript
+// User-focused API (recommended)
 createPolicy('tenant_isolation')
   .on('tenant_data')
-  .for('ALL')
-  .restrictive()
-  .when(column('tenant_id').eq(session.get('app.current_tenant_id', 'integer')));
+  .all()
+  .requireAll()
+  .when(column('tenant_id').belongsToTenant());
 ```
 
 ### Owner or Member Access
 
 ```typescript
+// User-focused API (recommended)
 createPolicy('project_access')
   .on('projects')
-  .for('SELECT')
+  .read()
   .when(
     column('user_id').eq(auth.uid())
       .or(
@@ -205,20 +249,22 @@ createPolicy('project_access')
 ### INSERT with Validation
 
 ```typescript
+// User-focused API (recommended)
 createPolicy('user_documents_insert')
   .on('user_documents')
-  .for('INSERT')
+  .write()
   .allow(column('user_id').eq(auth.uid()));
 ```
 
 ### UPDATE with Different Conditions
 
 ```typescript
+// User-focused API (recommended)
 createPolicy('user_documents_update')
   .on('user_documents')
-  .for('UPDATE')
-  .when(column('user_id').eq(auth.uid()))
-  .withCheck(column('user_id').eq(auth.uid()));
+  .update()
+  .allow(column('user_id').eq(auth.uid()));
+  // .allow() automatically sets both USING and WITH CHECK for UPDATE
 ```
 
 
