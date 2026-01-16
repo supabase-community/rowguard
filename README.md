@@ -14,13 +14,13 @@ A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies with 
 ## Installation
 
 ```bash
-npm install rls-dsl
+npm install ts-to-rls
 ```
 
 ## Quick Start
 
 ```typescript
-import { createPolicy, column, auth, from } from 'rls-dsl';
+import { createPolicy, column, auth, from } from 'ts-to-rls';
 
 // Simple user ownership (using user-focused API)
 const policy = createPolicy('user_documents')
@@ -56,7 +56,7 @@ console.log(policy.toSQL());
 ### Policy Templates
 
 ```typescript
-import { policies } from 'rls-dsl';
+import { policies } from 'ts-to-rls';
 
 const [policy] = policies.userOwned('documents', 'SELECT');
 const tenantPolicy = policies.tenantIsolation('tenant_data');
@@ -148,7 +148,7 @@ column('user_id').eq(auth.uid())
 ### Subqueries
 
 ```typescript
-import { column, from, auth } from 'rls-dsl';
+import { column, from, auth } from 'ts-to-rls';
 
 column('id').in(
   from('project_members')
