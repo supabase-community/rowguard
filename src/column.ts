@@ -104,6 +104,21 @@ export class ColumnBuilder {
     this.columnName = columnName;
   }
 
+  /**
+   * Equals comparison
+   *
+   * @example
+   * ```typescript
+   * // Compare with literal value
+   * column('status').eq('active')
+   *
+   * // Compare with auth context
+   * column('user_id').eq(auth.uid())
+   *
+   * // Compare with session variable
+   * column('tenant_id').eq(session.get('app.tenant_id', 'integer'))
+   * ```
+   */
   eq(
     value: string | number | boolean | Date | null | Condition | ConditionChain
   ): ConditionChain {
@@ -114,6 +129,15 @@ export class ColumnBuilder {
     );
   }
 
+  /**
+   * Not equals comparison
+   *
+   * @example
+   * ```typescript
+   * column('status').neq('deleted')
+   * column('user_id').neq(auth.uid())
+   * ```
+   */
   neq(
     value: string | number | boolean | Date | null | Condition | ConditionChain
   ): ConditionChain {
@@ -124,6 +148,16 @@ export class ColumnBuilder {
     );
   }
 
+  /**
+   * Greater than comparison
+   *
+   * @example
+   * ```typescript
+   * column('age').gt(18)
+   * column('price').gt(100)
+   * column('created_at').gt(new Date('2024-01-01'))
+   * ```
+   */
   gt(
     value: string | number | boolean | Date | null | Condition | ConditionChain
   ): ConditionChain {
@@ -134,6 +168,15 @@ export class ColumnBuilder {
     );
   }
 
+  /**
+   * Greater than or equal comparison
+   *
+   * @example
+   * ```typescript
+   * column('age').gte(18)
+   * column('quantity').gte(1)
+   * ```
+   */
   gte(
     value: string | number | boolean | Date | null | Condition | ConditionChain
   ): ConditionChain {
@@ -144,6 +187,15 @@ export class ColumnBuilder {
     );
   }
 
+  /**
+   * Less than comparison
+   *
+   * @example
+   * ```typescript
+   * column('age').lt(65)
+   * column('stock').lt(10)
+   * ```
+   */
   lt(
     value: string | number | boolean | Date | null | Condition | ConditionChain
   ): ConditionChain {
@@ -154,6 +206,15 @@ export class ColumnBuilder {
     );
   }
 
+  /**
+   * Less than or equal comparison
+   *
+   * @example
+   * ```typescript
+   * column('price').lte(100)
+   * column('discount').lte(50)
+   * ```
+   */
   lte(
     value: string | number | boolean | Date | null | Condition | ConditionChain
   ): ConditionChain {
@@ -166,6 +227,13 @@ export class ColumnBuilder {
 
   /**
    * LIKE pattern matching (case-sensitive)
+   *
+   * @example
+   * ```typescript
+   * column('email').like('%@company.com')
+   * column('name').like('John%')
+   * column('code').like('PRE_%')
+   * ```
    */
   like(pattern: string): ConditionChain {
     const colName = this.columnName;
@@ -182,6 +250,12 @@ export class ColumnBuilder {
 
   /**
    * ILIKE pattern matching (case-insensitive)
+   *
+   * @example
+   * ```typescript
+   * column('name').ilike('john%')  // Matches 'John', 'JOHN', 'john'
+   * column('email').ilike('%@COMPANY.COM')
+   * ```
    */
   ilike(pattern: string): ConditionChain {
     const colName = this.columnName;
@@ -198,6 +272,19 @@ export class ColumnBuilder {
 
   /**
    * IN membership check
+   *
+   * @example
+   * ```typescript
+   * // Array of values
+   * column('status').in(['active', 'pending', 'approved'])
+   *
+   * // Subquery
+   * column('id').in(
+   *   from('project_members')
+   *     .select('project_id')
+   *     .where(column('user_id').eq(auth.uid()))
+   * )
+   * ```
    */
   in(
     values: (string | number | boolean | Date | null)[] | SubqueryBuilder
@@ -223,6 +310,15 @@ export class ColumnBuilder {
 
   /**
    * Contains operator (for arrays/JSONB)
+   *
+   * @example
+   * ```typescript
+   * // Check if array column contains values
+   * column('tags').contains(['important', 'urgent'])
+   *
+   * // Check if JSONB contains value
+   * column('metadata').contains({ status: 'active' })
+   * ```
    */
   contains(
     value:
@@ -247,6 +343,15 @@ export class ColumnBuilder {
 
   /**
    * IS NULL check
+   *
+   * @example
+   * ```typescript
+   * // Allow access if deleted_at is null (not deleted)
+   * column('deleted_at').isNull()
+   *
+   * // Check for optional field
+   * column('approved_at').isNull()
+   * ```
    */
   isNull(): ConditionChain {
     const colName = this.columnName;
@@ -262,6 +367,15 @@ export class ColumnBuilder {
 
   /**
    * IS NOT NULL check
+   *
+   * @example
+   * ```typescript
+   * // Only show verified users
+   * column('verified_at').isNotNull()
+   *
+   * // Only show published posts
+   * column('published_at').isNotNull()
+   * ```
    */
   isNotNull(): ConditionChain {
     const colName = this.columnName;
@@ -277,6 +391,23 @@ export class ColumnBuilder {
 
   /**
    * Check if column equals current user ID (owner check)
+   *
+   * Shorthand for `.eq(auth.uid())` - commonly used for user ownership checks.
+   *
+   * @example
+   * ```typescript
+   * // Users can only see their own documents
+   * createPolicy('user_docs')
+   *   .on('documents')
+   *   .read()
+   *   .when(column('user_id').isOwner());
+   *
+   * // Users can only update their own profile
+   * createPolicy('update_profile')
+   *   .on('profiles')
+   *   .update()
+   *   .when(column('user_id').isOwner());
+   * ```
    */
   isOwner(): ConditionChain {
     return this.eq(auth.uid());
@@ -284,6 +415,26 @@ export class ColumnBuilder {
 
   /**
    * Check if column equals true (public visibility check)
+   *
+   * Shorthand for `.eq(true)` - commonly used for public visibility.
+   *
+   * @example
+   * ```typescript
+   * // Anyone can see public documents
+   * createPolicy('public_docs')
+   *   .on('documents')
+   *   .read()
+   *   .when(column('is_public').isPublic());
+   *
+   * // Users can see their own docs OR public docs
+   * createPolicy('view_docs')
+   *   .on('documents')
+   *   .read()
+   *   .when(
+   *     column('user_id').isOwner()
+   *       .or(column('is_public').isPublic())
+   *   );
+   * ```
    */
   isPublic(): ConditionChain {
     return this.eq(true);
@@ -291,7 +442,27 @@ export class ColumnBuilder {
 
   /**
    * Check if column equals the tenant ID from session variable (multi-tenant isolation)
+   *
+   * Shorthand for `.eq(session.get(sessionKey, 'integer'))` - used for tenant isolation.
+   *
    * @param sessionKey Session variable key (default: 'app.current_tenant_id')
+   *
+   * @example
+   * ```typescript
+   * // Restrict all access to current tenant
+   * createPolicy('tenant_isolation')
+   *   .on('documents')
+   *   .all()
+   *   .requireAll()
+   *   .when(column('tenant_id').belongsToTenant());
+   *
+   * // Custom session key
+   * createPolicy('org_isolation')
+   *   .on('projects')
+   *   .all()
+   *   .requireAll()
+   *   .when(column('org_id').belongsToTenant('app.current_org_id'));
+   * ```
    */
   belongsToTenant(
     sessionKey: string = "app.current_tenant_id"
@@ -301,9 +472,29 @@ export class ColumnBuilder {
 
   /**
    * Check if column value is in a subquery from a join table where user is a member
+   *
+   * Generates an IN subquery to check membership in a join table.
+   *
    * @param joinTable The join/membership table name
    * @param foreignKey The foreign key column in the join table
    * @param localKey The local key column in the current table (default: 'id')
+   *
+   * @example
+   * ```typescript
+   * // Users can see projects they're members of
+   * createPolicy('member_projects')
+   *   .on('projects')
+   *   .read()
+   *   .when(column('id').isMemberOf('project_members', 'project_id'));
+   *
+   * // Users can see organizations they belong to
+   * createPolicy('org_access')
+   *   .on('organizations')
+   *   .read()
+   *   .when(
+   *     column('id').isMemberOf('organization_members', 'organization_id')
+   *   );
+   * ```
    */
   isMemberOf(
     joinTable: string,

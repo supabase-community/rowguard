@@ -1,0 +1,32 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs",
+  "plugin": [],
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeExternals": true,
+  "readme": "README.md",
+  "name": "RLS DSL",
+  "navigationLinks": {
+    "GitHub": "https://github.com/supabase/ts-to-rls"
+  },
+  "includeVersion": true,
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Function",
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Enum"
+  ],
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "Policy Builder",
+    "Conditions",
+    "Context",
+    "Types",
+    "*"
+  ],
+  "basePath": "/ts-to-rls/"
+}

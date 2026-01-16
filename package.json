@@ -1,8 +1,8 @@
 {
-  "name": "rls-dsl",
+  "name": "ts-to-rls",
   "version": "0.1.0",
   "description": "TypeScript DSL for defining Row Level Security policies - works in Node.js, Deno, Bun, and browsers",
-  "packageManager": "pnpm@8.15.0",
+  "packageManager": "pnpm@10.28.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -22,6 +22,7 @@
   ],
   "scripts": {
     "build": "tsc && dts-bundle-generator -o dist/bundle.d.ts src/index.ts",
+    "docs": "typedoc",
     "lint": "eslint src tests",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -53,12 +54,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/supabase/rls-dsl.git"
+    "url": "https://github.com/supabase/ts-to-rls.git"
   },
   "bugs": {
-    "url": "https://github.com/supabase/rls-dsl/issues"
+    "url": "https://github.com/supabase/ts-to-rls/issues"
   },
-  "homepage": "https://github.com/supabase/rls-dsl#readme",
+  "homepage": "https://github.com/supabase/ts-to-rls#readme",
   "engines": {
     "node": ">=14.0.0"
   },
@@ -73,6 +74,7 @@
     "dts-bundle-generator": "^9.5.1",
     "eslint": "^9.39.1",
     "pg": "^8.11.3",
+    "typedoc": "^0.28.16",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.46.3",
     "uuid": "^10.0.0",

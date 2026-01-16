@@ -55,13 +55,44 @@ export class SubqueryBuilder {
 
   /**
    * Specify the columns to select
+   *
    * @param columns Column name(s) to select
+   *
+   * @example
+   * ```typescript
+   * // Select single column
+   * from('project_members').select('project_id')
+   *
+   * // Select multiple columns
+   * from('users').select(['id', 'email', 'name'])
+   * ```
    */
   select(columns: string | string[]): this {
     this._select = columns;
     return this;
   }
 
+  /**
+   * Add a WHERE clause to filter subquery results
+   *
+   * @param condition The condition to filter by
+   *
+   * @example
+   * ```typescript
+   * // Filter by user
+   * from('project_members')
+   *   .select('project_id')
+   *   .where(column('user_id').eq(auth.uid()))
+   *
+   * // Complex condition
+   * from('projects')
+   *   .select('id')
+   *   .where(
+   *     column('status').eq('active')
+   *       .and(column('is_public').eq(true))
+   *   )
+   * ```
+   */
   where(condition: Condition | ConditionChain): this {
     const normalizedCondition =
       condition instanceof ConditionChain
@@ -79,6 +110,38 @@ export class SubqueryBuilder {
     return this;
   }
 
+  /**
+   * Add a JOIN clause to the subquery
+   *
+   * @param table The table to join
+   * @param on The join condition
+   * @param type The join type (default: 'inner')
+   * @param alias Optional alias for the joined table
+   *
+   * @example
+   * ```typescript
+   * // Simple join
+   * from('projects', 'p')
+   *   .select('p.id')
+   *   .join(
+   *     'project_members',
+   *     column('p.id').eq('pm.project_id'),
+   *     'inner',
+   *     'pm'
+   *   )
+   *   .where(column('pm.user_id').eq(auth.uid()))
+   *
+   * // LEFT JOIN
+   * from('organizations', 'org')
+   *   .select('org.id')
+   *   .join(
+   *     'organization_members',
+   *     column('org.id').eq('om.organization_id'),
+   *     'left',
+   *     'om'
+   *   )
+   * ```
+   */
   join(
     table: string,
     on: Condition | ConditionChain,
@@ -140,8 +203,57 @@ export class SubqueryBuilder {
 
 /**
  * Create a new subquery builder starting with a FROM clause
+ *
+ * Used within `.in()` clauses to create subqueries for membership checks.
+ *
  * @param table Table name
  * @param alias Optional table alias
+ * @returns A SubqueryBuilder instance for building subqueries
+ *
+ * @example
+ * ```typescript
+ * // Simple subquery - users can see projects they're members of
+ * createPolicy('member_projects')
+ *   .on('projects')
+ *   .read()
+ *   .when(
+ *     column('id').in(
+ *       from('project_members')
+ *         .select('project_id')
+ *         .where(column('user_id').eq(auth.uid()))
+ *     )
+ *   );
+ *
+ * // Subquery with alias
+ * createPolicy('org_projects')
+ *   .on('projects')
+ *   .read()
+ *   .when(
+ *     column('org_id').in(
+ *       from('organizations', 'org')
+ *         .select('org.id')
+ *         .where(column('org.is_active').eq(true))
+ *     )
+ *   );
+ *
+ * // Subquery with join
+ * createPolicy('accessible_docs')
+ *   .on('documents')
+ *   .read()
+ *   .when(
+ *     column('project_id').in(
+ *       from('projects', 'p')
+ *         .select('p.id')
+ *         .join(
+ *           'project_members',
+ *           column('p.id').eq('pm.project_id'),
+ *           'inner',
+ *           'pm'
+ *         )
+ *         .where(column('pm.user_id').eq(auth.uid()))
+ *     )
+ *   );
+ * ```
  */
 export function from(table: string, alias?: string): SubqueryBuilder {
   return new SubqueryBuilder(table, alias);

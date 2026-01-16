@@ -317,6 +317,14 @@ export class PolicyBuilder {
 
   /**
    * User-focused alias for .for("SELECT") - allows reading rows
+   *
+   * @example
+   * ```typescript
+   * createPolicy('view_docs')
+   *   .on('documents')
+   *   .read()
+   *   .when(column('user_id').isOwner());
+   * ```
    */
   read(): this {
     return this.for("SELECT");
@@ -324,6 +332,14 @@ export class PolicyBuilder {
 
   /**
    * User-focused alias for .for("INSERT") - allows creating rows
+   *
+   * @example
+   * ```typescript
+   * createPolicy('create_docs')
+   *   .on('documents')
+   *   .write()
+   *   .withCheck(column('user_id').isOwner());
+   * ```
    */
   write(): this {
     return this.for("INSERT");
@@ -331,6 +347,15 @@ export class PolicyBuilder {
 
   /**
    * User-focused alias for .for("UPDATE") - allows updating rows
+   *
+   * @example
+   * ```typescript
+   * createPolicy('update_docs')
+   *   .on('documents')
+   *   .update()
+   *   .when(column('user_id').isOwner())
+   *   .withCheck(column('user_id').isOwner());
+   * ```
    */
   update(): this {
     return this.for("UPDATE");
@@ -338,6 +363,14 @@ export class PolicyBuilder {
 
   /**
    * User-focused alias for .for("DELETE") - allows deleting rows
+   *
+   * @example
+   * ```typescript
+   * createPolicy('delete_docs')
+   *   .on('documents')
+   *   .delete()
+   *   .when(column('user_id').isOwner());
+   * ```
    */
   delete(): this {
     return this.for("DELETE");
@@ -345,6 +378,14 @@ export class PolicyBuilder {
 
   /**
    * User-focused alias for .for("ALL") - allows all operations
+   *
+   * @example
+   * ```typescript
+   * createPolicy('full_access')
+   *   .on('documents')
+   *   .all()
+   *   .when(column('user_id').isOwner());
+   * ```
    */
   all(): this {
     return this.for("ALL");
@@ -360,6 +401,26 @@ export class PolicyBuilder {
 
   /**
    * Set the USING clause (read filter)
+   *
+   * Determines which existing rows can be seen/modified by the current user.
+   *
+   * @example
+   * ```typescript
+   * // Users can only see their own documents
+   * createPolicy('view_own_docs')
+   *   .on('documents')
+   *   .read()
+   *   .when(column('user_id').isOwner());
+   *
+   * // Complex condition with OR
+   * createPolicy('view_docs')
+   *   .on('documents')
+   *   .read()
+   *   .when(
+   *     column('user_id').isOwner()
+   *       .or(column('is_public').eq(true))
+   *   );
+   * ```
    */
   when(condition: Condition | ConditionChain): this {
     this.state.using = normalizeCondition(condition);
@@ -368,6 +429,24 @@ export class PolicyBuilder {
 
   /**
    * Set the WITH CHECK clause (write validation)
+   *
+   * Validates that new/modified rows meet the specified condition.
+   *
+   * @example
+   * ```typescript
+   * // Prevent users from creating documents for other users
+   * createPolicy('create_docs')
+   *   .on('documents')
+   *   .write()
+   *   .withCheck(column('user_id').isOwner());
+   *
+   * // For UPDATE, use both when() and withCheck()
+   * createPolicy('update_docs')
+   *   .on('documents')
+   *   .update()
+   *   .when(column('user_id').isOwner())  // Can only update own docs
+   *   .withCheck(column('user_id').isOwner());  // Can't change ownership
+   * ```
    */
   withCheck(condition: Condition | ConditionChain): this {
     this.state.withCheck = normalizeCondition(condition);
@@ -379,6 +458,27 @@ export class PolicyBuilder {
    * - SELECT/DELETE: sets USING clause (read filter)
    * - INSERT: sets WITH CHECK clause (write validation)
    * - UPDATE/ALL: sets both USING and WITH CHECK clauses (same condition)
+   *
+   * @example
+   * ```typescript
+   * // For SELECT - sets USING only
+   * createPolicy('read_docs')
+   *   .on('documents')
+   *   .read()
+   *   .allow(column('user_id').isOwner());
+   *
+   * // For INSERT - sets WITH CHECK only
+   * createPolicy('create_docs')
+   *   .on('documents')
+   *   .write()
+   *   .allow(column('user_id').isOwner());
+   *
+   * // For UPDATE - sets both USING and WITH CHECK
+   * createPolicy('update_docs')
+   *   .on('documents')
+   *   .update()
+   *   .allow(column('user_id').isOwner());
+   * ```
    */
   allow(condition: Condition | ConditionChain): this {
     const operation = this.state.operation;
@@ -424,6 +524,26 @@ export class PolicyBuilder {
 
   /**
    * User-focused alias for .restrictive() - all policies must pass
+   *
+   * Makes this policy RESTRICTIVE, meaning it must pass in addition to other policies.
+   * Useful for adding constraints that apply to all operations (e.g., tenant isolation).
+   *
+   * @example
+   * ```typescript
+   * // Tenant isolation that restricts all other policies
+   * createPolicy('tenant_isolation')
+   *   .on('documents')
+   *   .all()
+   *   .requireAll()  // This policy AND other policies must pass
+   *   .when(column('tenant_id').belongsToTenant());
+   *
+   * // Now add a permissive policy for user access
+   * createPolicy('user_access')
+   *   .on('documents')
+   *   .read()
+   *   .when(column('user_id').isOwner());
+   * // Users can only see their own docs within their tenant
+   * ```
    */
   requireAll(): this {
     return this.restrictive();
@@ -431,6 +551,25 @@ export class PolicyBuilder {
 
   /**
    * User-focused alias for .permissive() - any policy can grant access
+   *
+   * Makes this policy PERMISSIVE (default), meaning if this policy passes,
+   * access is granted (unless blocked by a RESTRICTIVE policy).
+   *
+   * @example
+   * ```typescript
+   * // Multiple ways to access documents
+   * createPolicy('owner_access')
+   *   .on('documents')
+   *   .read()
+   *   .allowAny()  // Explicit, but this is the default
+   *   .when(column('user_id').isOwner());
+   *
+   * createPolicy('public_access')
+   *   .on('documents')
+   *   .read()
+   *   .when(column('is_public').eq(true));
+   * // User can see a document if EITHER policy passes
+   * ```
    */
   allowAny(): this {
     return this.permissive();
@@ -541,6 +680,27 @@ export class PolicyBuilder {
 
 /**
  * Create a new policy builder
+ *
+ * @param name The name of the policy
+ * @returns A PolicyBuilder instance for fluent API chaining
+ *
+ * @example
+ * ```typescript
+ * // Simple user ownership policy
+ * const policy = createPolicy('user_documents')
+ *   .on('documents')
+ *   .read()
+ *   .when(column('user_id').isOwner());
+ *
+ * // Complex policy with multiple conditions
+ * const policy = createPolicy('project_access')
+ *   .on('projects')
+ *   .read()
+ *   .when(
+ *     column('is_public').eq(true)
+ *       .or(column('user_id').isOwner())
+ *   );
+ * ```
  */
 export function createPolicy(name: string): PolicyBuilder {
   return new PolicyBuilder(name);
@@ -552,9 +712,27 @@ export function createPolicy(name: string): PolicyBuilder {
 export const policies = {
   /**
    * User ownership policy - users can only access their own rows
+   *
    * @param table Table name
    * @param operations Operations to allow (default: ALL)
    * @param userIdColumn Column containing user ID (default: user_id)
+   * @returns Array of PolicyBuilder instances (one per operation)
+   *
+   * @example
+   * ```typescript
+   * // Allow all operations on user's own documents
+   * const [policy] = policies.userOwned('documents');
+   * console.log(policy.toSQL());
+   *
+   * // Only allow SELECT and INSERT
+   * const [selectPolicy, insertPolicy] = policies.userOwned(
+   *   'documents',
+   *   ['SELECT', 'INSERT']
+   * );
+   *
+   * // Custom user ID column
+   * const [policy] = policies.userOwned('posts', 'ALL', 'author_id');
+   * ```
    */
   userOwned(
     table: string,
@@ -593,9 +771,32 @@ export const policies = {
 
   /**
    * Tenant isolation policy - users can only access rows from their tenant
+   *
+   * Creates a RESTRICTIVE policy that enforces tenant isolation across all operations.
+   *
    * @param table Table name
    * @param tenantColumn Column containing tenant ID (default: tenant_id)
    * @param sessionKey Session variable key (default: app.current_tenant_id)
+   * @returns A RESTRICTIVE PolicyBuilder instance
+   *
+   * @example
+   * ```typescript
+   * // Basic tenant isolation
+   * const policy = policies.tenantIsolation('documents');
+   * console.log(policy.toSQL());
+   *
+   * // Custom tenant column and session key
+   * const policy = policies.tenantIsolation(
+   *   'projects',
+   *   'org_id',
+   *   'app.current_org_id'
+   * );
+   *
+   * // Combine with other policies
+   * const tenantPolicy = policies.tenantIsolation('documents');
+   * const [userPolicy] = policies.userOwned('documents', 'SELECT');
+   * // Users see only their docs within their tenant
+   * ```
    */
   tenantIsolation(
     table: string,
@@ -611,8 +812,27 @@ export const policies = {
 
   /**
    * Public access policy - anyone can read public rows
+   *
+   * Creates a SELECT policy that allows reading rows marked as public.
+   *
    * @param table Table name
    * @param visibilityColumn Column indicating public visibility (default: is_public)
+   * @returns A PolicyBuilder instance for SELECT operations
+   *
+   * @example
+   * ```typescript
+   * // Allow reading public documents
+   * const policy = policies.publicAccess('documents');
+   * console.log(policy.toSQL());
+   *
+   * // Custom visibility column
+   * const policy = policies.publicAccess('posts', 'published');
+   *
+   * // Combine with ownership policy
+   * const publicPolicy = policies.publicAccess('documents');
+   * const [ownerPolicy] = policies.userOwned('documents', 'SELECT');
+   * // Users can see public docs OR their own docs
+   * ```
    */
   publicAccess(
     table: string,
@@ -626,9 +846,27 @@ export const policies = {
 
   /**
    * Role-based access policy - only specific roles can access
+   *
+   * Creates policies that grant access to users with a specific role.
+   *
    * @param table Table name
    * @param role Role name
    * @param operations Operations to allow (default: ALL)
+   * @returns Array of PolicyBuilder instances (one per operation)
+   *
+   * @example
+   * ```typescript
+   * // Admins can do everything
+   * const [policy] = policies.roleAccess('documents', 'admin');
+   * console.log(policy.toSQL());
+   *
+   * // Moderators can only read and update
+   * const policies = policies.roleAccess(
+   *   'posts',
+   *   'moderator',
+   *   ['SELECT', 'UPDATE']
+   * );
+   * ```
    */
   roleAccess(
     table: string,
