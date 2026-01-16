@@ -44,7 +44,7 @@ jobs:
       - name: Wait for Supabase to be ready
         run: |
           echo "Waiting for Supabase to start (may take several minutes on first run)..."
-          timeout 300 bash -c 'until supabase status 2>/dev/null | grep -q "Project URL"; do echo "Waiting for Supabase..."; sleep 5; done'
+          timeout 300 bash -c 'until npx supabase status 2>/dev/null | grep -q "Project URL"; do echo "Waiting for Supabase..."; sleep 5; done'
           echo "Supabase is ready!"
           npx supabase status
 
@@ -55,4 +55,4 @@ jobs:
 
       - name: Stop Supabase
         if: always()
-        run: supabase stop
+        run: npx supabase stop
