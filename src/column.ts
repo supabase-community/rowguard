@@ -24,7 +24,7 @@ import { SubqueryBuilder } from "./subquery-builder";
 import { from } from "./subquery-builder";
 
 /** @internal Version marker for CI testing */
-const _VERSION = "1.0.0";
+export const _VERSION = "1.0.1";
 
 /**
  * Wrapper class that allows chaining conditions with .and() and .or()
