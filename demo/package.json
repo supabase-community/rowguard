@@ -1,5 +1,5 @@
 {
-  "name": "@ts-to-rls/demo",
+  "name": "@rowguard/demo",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -15,7 +15,7 @@
     "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "ts-to-rls": "workspace:*"
+    "rowguard": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

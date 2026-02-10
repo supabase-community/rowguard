@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Play, Copy, CheckCircle, AlertCircle } from 'lucide-react';
 import Editor, { Monaco } from '@monaco-editor/react';
-import * as RLS from 'ts-to-rls';
+import * as RLS from 'rowguard';
 
 // Import bundled type definitions - single file, zero maintenance
-import rlsDslBundledTypes from '../ts-to-rls-types.d.ts?raw';
+import rlsDslBundledTypes from '../rowguard-types.d.ts?raw';
 
 const EXAMPLE_CODE = `const p = policy('user_documents')
   .on('documents')
@@ -167,12 +167,12 @@ export default function RLSTester() {
     // Add bundled type definitions to Monaco
     monaco.languages.typescript.typescriptDefaults.addExtraLib(
       rlsDslBundledTypes,
-      'file:///node_modules/ts-to-rls/index.d.ts'
+      'file:///node_modules/rowguard/index.d.ts'
     );
 
     // Create global declarations so functions work without imports
     const globalDeclarations = `
-      import type * as RLS from 'ts-to-rls';
+      import type * as RLS from 'rowguard';
 
       declare global {
         const policy: typeof RLS.policy;
@@ -269,14 +269,14 @@ export default function RLSTester() {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-4xl font-bold text-text-primary mb-2">
-                RLS Policy DSL Tester
+                Rowguard - RLS Policy DSL Tester
               </h1>
               <p className="text-text-secondary">
                 Test and generate PostgreSQL Row Level Security policies with TypeScript
               </p>
             </div>
             <a
-              href="https://supabase.github.io/ts-to-rls/"
+              href="https://supabase-community.github.io/rowguard/"
               target="_blank"
               rel="noopener noreferrer"
               className="px-4 py-2 bg-supabase-lime hover:bg-supabase-lime-hover text-dark-bg rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
@@ -396,7 +396,7 @@ export default function RLSTester() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-text-primary">Available Functions</h3>
             <a
-              href="https://supabase.github.io/ts-to-rls/"
+              href="https://supabase-community.github.io/rowguard/"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-supabase-lime hover:text-supabase-lime-hover font-medium"

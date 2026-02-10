@@ -7,9 +7,9 @@
   "excludeProtected": false,
   "excludeExternals": true,
   "readme": "README.md",
-  "name": "RLS DSL",
+  "name": "Rowguard - RLS Policy DSL",
   "navigationLinks": {
-    "GitHub": "https://github.com/supabase/ts-to-rls"
+    "GitHub": "https://github.com/supabase-community/rowguard"
   },
   "includeVersion": true,
   "sort": ["source-order"],
@@ -28,5 +28,5 @@
     "Types",
     "*"
   ],
-  "basePath": "/ts-to-rls/"
+  "basePath": "/rowguard/"
 }

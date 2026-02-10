@@ -1,5 +1,5 @@
 /**
- * Core types and interfaces for RLS Policy DSL
+ * Core types and interfaces for Rowguard - RLS Policy DSL
  */
 
 export type PolicyOperation = "SELECT" | "INSERT" | "UPDATE" | "DELETE" | "ALL";

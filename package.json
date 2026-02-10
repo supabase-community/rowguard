@@ -1,5 +1,5 @@
 {
-  "name": "ts-to-rls",
+  "name": "rowguard",
   "version": "0.1.0",
   "description": "TypeScript DSL for defining Row Level Security policies - works in Node.js, Deno, Bun, and browsers",
   "packageManager": "pnpm@10.28.0",
@@ -57,12 +57,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/supabase/ts-to-rls.git"
+    "url": "https://github.com/supabase-community/rowguard.git"
   },
   "bugs": {
-    "url": "https://github.com/supabase/ts-to-rls/issues"
+    "url": "https://github.com/supabase-community/rowguard/issues"
   },
-  "homepage": "https://github.com/supabase/ts-to-rls#readme",
+  "homepage": "https://github.com/supabase-community/rowguard#readme",
   "engines": {
     "node": ">=14.0.0"
   },
