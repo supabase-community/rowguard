@@ -8,6 +8,18 @@ A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies with 
 
 > **⚠️ Experimental:** This is an experimental project and not an official Supabase library. It is not published to npm. Test builds are available via [pkg-pr-new](https://pkg.pr.new) for evaluation purposes only.
 
+## Interactive Demo
+
+Try the live demo at https://ts-to-rls-demo.vercel.app/
+
+To run the demo locally:
+```bash
+pnpm install
+pnpm demo:dev
+```
+
+The demo source code is in the [`demo/`](./demo) directory.
+
 ## Features
 
 - Simple & intuitive fluent API that reads like natural language

@@ -32,7 +32,10 @@
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "test:integration:full": "bash scripts/run-integration-tests.sh",
-    "prepublishOnly": "pnpm build && pnpm test"
+    "prepublishOnly": "pnpm build && pnpm test",
+    "demo:dev": "cd demo && pnpm dev",
+    "demo:build": "pnpm build && cd demo && pnpm build",
+    "demo:preview": "cd demo && pnpm preview"
   },
   "keywords": [
     "rls",

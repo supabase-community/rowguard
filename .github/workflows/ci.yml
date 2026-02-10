@@ -56,3 +56,19 @@ jobs:
       - name: Stop Supabase
         if: always()
         run: npx supabase stop
+
+      - name: Install demo dependencies
+        working-directory: demo
+        run: pnpm install
+
+      - name: Typecheck demo
+        working-directory: demo
+        run: pnpm typecheck
+
+      - name: Build demo
+        working-directory: demo
+        run: pnpm build
+
+      - name: Lint demo
+        working-directory: demo
+        run: pnpm lint
