@@ -1,5 +1,5 @@
 /**
- * Main entry point for RLS Policy DSL
+ * Main entry point for Rowguard - RLS Policy DSL
  */
 
 export * from "./types";

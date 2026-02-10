@@ -1,12 +1,24 @@
-# RLS Policy DSL
+# Rowguard - RLS Policy DSL
 
-[![Docs](https://img.shields.io/badge/docs-API%20Reference-blue?logo=readthedocs)](https://supabase.github.io/ts-to-rls/)
+[![Docs](https://img.shields.io/badge/docs-API%20Reference-blue?logo=readthedocs)](https://supabase-community.github.io/rowguard/)
 [![License](https://img.shields.io/npm/l/nx.svg?style=flat-square)](./LICENSE)
-[![pkg.pr.new](https://pkg.pr.new/badge/supabase/ts-to-rls)](https://pkg.pr.new/~/supabase/ts-to-rls)
+[![pkg.pr.new](https://pkg.pr.new/badge/supabase-community/rowguard)](https://pkg.pr.new/~/supabase-community/rowguard)
 
 A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies with a clean, type-safe API.
 
 > **⚠️ Experimental:** This is an experimental project and not an official Supabase library. It is not published to npm. Test builds are available via [pkg-pr-new](https://pkg.pr.new) for evaluation purposes only.
+
+## Interactive Demo
+
+Try the live demo at https://rowguard-demo.vercel.app/
+
+To run the demo locally:
+```bash
+pnpm install
+pnpm demo:dev
+```
+
+The demo source code is in the [`demo/`](./demo) directory.
 
 ## Features
 
@@ -23,13 +35,13 @@ This package is not published to npm. Test builds are available via [pkg-pr-new]
 
 ```bash
 # Install a specific commit build (check pkg.pr.new badge for latest URL)
-npm install https://pkg.pr.new/supabase/ts-to-rls@{commit-sha}
+npm install https://pkg.pr.new/supabase-community/rowguard@{commit-sha}
 ```
 
 ## Quick Start
 
 ```typescript
-import { policy, column, auth, from, session } from 'ts-to-rls';
+import { policy, column, auth, from, session } from 'rowguard';
 
 // Simple user ownership (using user-focused API)
 const userDocsPolicy = policy('user_documents')
@@ -65,7 +77,7 @@ console.log(userDocsPolicy.toSQL());
 ### Policy Templates
 
 ```typescript
-import { policies } from 'ts-to-rls';
+import { policies } from 'rowguard';
 
 const [policy] = policies.userOwned('documents', 'SELECT');
 const tenantPolicy = policies.tenantIsolation('tenant_data');
@@ -157,7 +169,7 @@ column('user_id').eq(auth.uid())
 ### Subqueries
 
 ```typescript
-import { column, from, auth } from 'ts-to-rls';
+import { column, from, auth } from 'rowguard';
 
 column('id').in(
   from('project_members')

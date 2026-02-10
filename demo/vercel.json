@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd .. && pnpm build && cd demo && pnpm build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "framework": "vite",
+  "outputDirectory": "dist"
+}

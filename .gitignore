@@ -5,3 +5,8 @@ dist/
 coverage
 .nyc_output
 docs/
+
+# Demo
+demo/dist/
+demo/node_modules/
+demo/.vite/
