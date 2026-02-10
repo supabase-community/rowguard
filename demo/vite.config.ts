@@ -7,7 +7,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      'rowguard': path.resolve(__dirname, '../dist/index.js'),
+      // Use source files directly so Vite can bundle as ESM
+      'rowguard': path.resolve(__dirname, '../src/index.ts'),
     },
   },
   optimizeDeps: {
