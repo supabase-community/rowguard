@@ -3,8 +3,8 @@ import { Play, Copy, CheckCircle, AlertCircle } from 'lucide-react';
 import Editor, { Monaco } from '@monaco-editor/react';
 import * as RLS from 'rowguard';
 
-// Import bundled type definitions - single file, zero maintenance
-import rlsDslBundledTypes from '../rowguard-types.d.ts?raw';
+// Import bundled type definitions from the library's dist folder
+import rlsDslBundledTypes from '../../../dist/bundle.d.ts?raw';
 
 const EXAMPLE_CODE = `const p = policy('user_documents')
   .on('documents')
