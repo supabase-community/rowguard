@@ -52,9 +52,19 @@ async function setupDatabase(client: Client) {
   // Supabase's auth.uid() reads from request.jwt.claim.sub
   // We'll set that in setCurrentUser() function
 
+  // Drop existing tables first to ensure clean schema
+  await client.query(`DROP TABLE IF EXISTS organization_members CASCADE;`);
+  await client.query(`DROP TABLE IF EXISTS organizations CASCADE;`);
+  await client.query(`DROP TABLE IF EXISTS project_members CASCADE;`);
+  await client.query(`DROP TABLE IF EXISTS projects CASCADE;`);
+  await client.query(`DROP TABLE IF EXISTS user_roles CASCADE;`);
+  await client.query(`DROP TABLE IF EXISTS tenant_data CASCADE;`);
+  await client.query(`DROP TABLE IF EXISTS posts CASCADE;`);
+  await client.query(`DROP TABLE IF EXISTS documents CASCADE;`);
+
   // Create test tables
   await client.query(`
-    CREATE TABLE IF NOT EXISTS documents (
+    CREATE TABLE documents (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL,
       title TEXT NOT NULL,
@@ -66,7 +76,7 @@ async function setupDatabase(client: Client) {
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS posts (
+    CREATE TABLE posts (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id UUID NOT NULL,
       title TEXT NOT NULL,
@@ -78,7 +88,7 @@ async function setupDatabase(client: Client) {
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS tenant_data (
+    CREATE TABLE tenant_data (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       tenant_id INTEGER NOT NULL,
       name TEXT NOT NULL,
@@ -88,7 +98,7 @@ async function setupDatabase(client: Client) {
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS projects (
+    CREATE TABLE projects (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       created_by UUID NOT NULL,
       name TEXT NOT NULL,
@@ -98,7 +108,7 @@ async function setupDatabase(client: Client) {
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS project_members (
+    CREATE TABLE project_members (
       project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       user_id UUID NOT NULL,
       can_edit BOOLEAN DEFAULT FALSE,
@@ -108,7 +118,7 @@ async function setupDatabase(client: Client) {
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS user_roles (
+    CREATE TABLE user_roles (
       user_id UUID NOT NULL,
       role TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT NOW(),
@@ -117,7 +127,7 @@ async function setupDatabase(client: Client) {
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS organizations (
+    CREATE TABLE organizations (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       name TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT NOW()
@@ -125,7 +135,7 @@ async function setupDatabase(client: Client) {
   `);
 
   await client.query(`
-    CREATE TABLE IF NOT EXISTS organization_members (
+    CREATE TABLE organization_members (
       organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
       user_id UUID NOT NULL,
       role TEXT DEFAULT 'member',

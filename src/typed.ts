@@ -105,10 +105,8 @@ export type ColumnType<
  * Column builder that enforces value types match column types
  * Stores table context for qualified column references
  */
-export class TypedColumnBuilder<
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  T = unknown,
-> extends ColumnBuilder {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export class TypedColumnBuilder<_T = unknown> extends ColumnBuilder {
   private table: string;
   private col: string;
 
@@ -391,11 +389,11 @@ export class TypedColumnBuilder<
 /**
  * Policy builder with table type locked in
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export class TypedPolicyBuilder<
+  _DB,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  DB,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  TableName extends TableNames<DB>,
+  _TableName extends TableNames<_DB>,
 > extends PolicyBuilder {
   // All methods from PolicyBuilder are inherited and work the same
   // The table type is captured for use with typed column references
