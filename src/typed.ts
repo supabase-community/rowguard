@@ -105,7 +105,10 @@ export type ColumnType<
  * Column builder that enforces value types match column types
  * Stores table context for qualified column references
  */
-export class TypedColumnBuilder extends ColumnBuilder {
+export class TypedColumnBuilder<
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  T = unknown,
+> extends ColumnBuilder {
   private table: string;
   private col: string;
 
