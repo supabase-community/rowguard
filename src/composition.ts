@@ -2,8 +2,8 @@
  * Policy composition utilities
  */
 
-import { PolicyBuilder } from "./policy-builder";
-import { SQLGenerationOptions } from "./types";
+import { PolicyBuilder } from './policy-builder';
+import { SQLGenerationOptions } from './types';
 
 /**
  * Create a policy group for organization
@@ -36,7 +36,7 @@ export function policyGroupToSQL(
 ): string {
   const policySQLs = group.policies.map((p) => p.toSQL(options));
   if (group.description) {
-    return `-- ${group.description}\n${policySQLs.join(";\n\n")};`;
+    return `-- ${group.description}\n${policySQLs.join(';\n\n')};`;
   }
-  return policySQLs.join(";\n\n") + ";";
+  return policySQLs.join(';\n\n') + ';';
 }

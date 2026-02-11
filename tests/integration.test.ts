@@ -16,10 +16,10 @@ import {
   beforeAll,
   afterAll,
   beforeEach,
-} from "vitest";
-import { Pool, Client, PoolClient } from "pg";
-import { escapeLiteral } from "pg/lib/utils";
-import { v4 as uuidv4 } from "uuid";
+} from 'vitest';
+import { Pool, Client, PoolClient } from 'pg';
+import { escapeLiteral } from 'pg/lib/utils';
+import { v4 as uuidv4 } from 'uuid';
 import {
   policy,
   policies,
@@ -31,13 +31,13 @@ import {
   hasRole,
   auth,
   from,
-} from "../src/index";
+} from '../src/index';
 
 // Database connection configuration
 // Default to Supabase local instance (port 54322) if DATABASE_URL is not set
 const DATABASE_URL =
   process.env.DATABASE_URL ||
-  "postgres://postgres:postgres@localhost:54322/postgres";
+  'postgres://postgres:postgres@localhost:54322/postgres';
 
 let pool: Pool;
 let adminClient: Client;
@@ -355,7 +355,7 @@ async function setTenant(client: Client | PoolClient, tenantId: number | null) {
   }
 }
 
-describe("RLS Integration Tests", () => {
+describe('RLS Integration Tests', () => {
   beforeAll(async () => {
     // Create connection pool
     pool = new Pool({ connectionString: DATABASE_URL });
@@ -365,9 +365,9 @@ describe("RLS Integration Tests", () => {
       await adminClient.connect();
       await setupDatabase(adminClient);
     } catch (error) {
-      console.error("Failed to connect to database:", error);
+      console.error('Failed to connect to database:', error);
       console.error(
-        "Make sure PostgreSQL is running and DATABASE_URL is correct"
+        'Make sure PostgreSQL is running and DATABASE_URL is correct'
       );
       throw error;
     }
@@ -420,62 +420,62 @@ describe("RLS Integration Tests", () => {
     testData = await seedData(adminClient);
   });
 
-  describe("User Ownership Policies", () => {
-    test("users can only SELECT their own documents", async () => {
+  describe('User Ownership Policies', () => {
+    test('users can only SELECT their own documents', async () => {
       // Create policy using DSL
-      const p = policy("user_docs_select")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").isOwner());
+      const p = policy('user_docs_select')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').isOwner());
 
       const policySQL = p.toSQL();
 
       await adminClient.query(policySQL);
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
-      const uidCheck = await user1Client.query("SELECT auth.uid() as uid;");
+      const uidCheck = await user1Client.query('SELECT auth.uid() as uid;');
       expect(uidCheck.rows[0].uid).toBe(testData.users.user1);
 
       const user1Docs = await user1Client.query(
-        "SELECT id, title FROM documents ORDER BY title;"
+        'SELECT id, title FROM documents ORDER BY title;'
       );
       expect(user1Docs.rows).toHaveLength(2);
       expect(user1Docs.rows.map((r) => r.title)).toEqual([
-        "User1 Private Doc",
-        "User1 Public Doc",
+        'User1 Private Doc',
+        'User1 Public Doc',
       ]);
       user1Client.release();
 
       // Test as user2 - should see their own documents
       const user2Client = await pool.connect();
-      await user2Client.query("SET ROLE authenticated;");
+      await user2Client.query('SET ROLE authenticated;');
       await setCurrentUser(user2Client, testData.users.user2);
       const user2Docs = await user2Client.query(
-        "SELECT id, title FROM documents ORDER BY title;"
+        'SELECT id, title FROM documents ORDER BY title;'
       );
       expect(user2Docs.rows).toHaveLength(2);
       expect(user2Docs.rows.map((r) => r.title)).toEqual([
-        "User2 Private Doc",
-        "User2 Public Doc",
+        'User2 Private Doc',
+        'User2 Public Doc',
       ]);
       user2Client.release();
     });
 
-    test("users can only INSERT documents with their own user_id", async () => {
+    test('users can only INSERT documents with their own user_id', async () => {
       // Create policy using DSL
-      const p = policy("user_docs_insert")
-        .on("documents")
-        .for("INSERT")
-        .withCheck(column("user_id").isOwner());
+      const p = policy('user_docs_insert')
+        .on('documents')
+        .for('INSERT')
+        .withCheck(column('user_id').isOwner());
 
       const policySQL = p.toSQL();
       await adminClient.query(policySQL);
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       await user1Client.query(
@@ -493,19 +493,19 @@ describe("RLS Integration Tests", () => {
       user1Client.release();
     });
 
-    test("users can only UPDATE their own documents", async () => {
+    test('users can only UPDATE their own documents', async () => {
       // Create policy using DSL
-      const p = policy("user_docs_update")
-        .on("documents")
-        .for("UPDATE")
-        .when(column("user_id").isOwner())
-        .withCheck(column("user_id").isOwner());
+      const p = policy('user_docs_update')
+        .on('documents')
+        .for('UPDATE')
+        .when(column('user_id').isOwner())
+        .withCheck(column('user_id').isOwner());
 
       const policySQL = p.toSQL();
       await adminClient.query(policySQL);
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       await user1Client.query(
@@ -523,15 +523,15 @@ describe("RLS Integration Tests", () => {
     });
   });
 
-  describe("Public Access Policies", () => {
-    test("users can SELECT public documents regardless of ownership", async () => {
+  describe('Public Access Policies', () => {
+    test('users can SELECT public documents regardless of ownership', async () => {
       // Create policies: users can see their own OR public documents
-      const ownPolicy = policy("user_own_docs")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").isOwner());
+      const ownPolicy = policy('user_own_docs')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').isOwner());
 
-      const publicPolicy = policies.publicAccess("documents");
+      const publicPolicy = policies.publicAccess('documents');
 
       const ownSQL = ownPolicy.toSQL();
       const publicSQL = publicPolicy.toSQL();
@@ -540,34 +540,34 @@ describe("RLS Integration Tests", () => {
       await adminClient.query(publicSQL);
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       const docs = await user1Client.query(
-        "SELECT id, title, is_public FROM documents ORDER BY title;"
+        'SELECT id, title, is_public FROM documents ORDER BY title;'
       );
       expect(docs.rows).toHaveLength(3); // 2 own + 1 public from user2
       expect(docs.rows.map((r) => r.title)).toEqual([
-        "User1 Private Doc",
-        "User1 Public Doc",
-        "User2 Public Doc",
+        'User1 Private Doc',
+        'User1 Public Doc',
+        'User2 Public Doc',
       ]);
 
       user1Client.release();
     });
   });
 
-  describe("Tenant Isolation Policies", () => {
-    test("users can only access data from their current tenant", async () => {
+  describe('Tenant Isolation Policies', () => {
+    test('users can only access data from their current tenant', async () => {
       // Create restrictive tenant isolation policy
       // Note: RESTRICTIVE policies require at least one PERMISSIVE policy to also pass
       // So we add a permissive policy that allows all (but restrictive will filter it)
-      const permissivePolicy = policy("tenant_data_permissive")
-        .on("tenant_data")
-        .for("ALL")
+      const permissivePolicy = policy('tenant_data_permissive')
+        .on('tenant_data')
+        .for('ALL')
         .when(alwaysTrue());
 
-      const restrictivePolicy = policies.tenantIsolation("tenant_data");
+      const restrictivePolicy = policies.tenantIsolation('tenant_data');
 
       const permissiveSQL = permissivePolicy.toSQL();
       const restrictiveSQL = restrictivePolicy.toSQL();
@@ -575,93 +575,93 @@ describe("RLS Integration Tests", () => {
       await adminClient.query(restrictiveSQL);
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       await setTenant(user1Client, 1);
 
       const tenant1Data = await user1Client.query(
-        "SELECT id, name FROM tenant_data ORDER BY name;"
+        'SELECT id, name FROM tenant_data ORDER BY name;'
       );
       expect(tenant1Data.rows).toHaveLength(2);
       expect(tenant1Data.rows.map((r) => r.name)).toEqual([
-        "Tenant 1 Data",
-        "Tenant 1 More Data",
+        'Tenant 1 Data',
+        'Tenant 1 More Data',
       ]);
 
       await setTenant(user1Client, 2);
 
       const tenant2Data = await user1Client.query(
-        "SELECT id, name FROM tenant_data ORDER BY name;"
+        'SELECT id, name FROM tenant_data ORDER BY name;'
       );
       expect(tenant2Data.rows).toHaveLength(1);
-      expect(tenant2Data.rows[0].name).toBe("Tenant 2 Data");
+      expect(tenant2Data.rows[0].name).toBe('Tenant 2 Data');
 
       user1Client.release();
     });
   });
 
-  describe("Complex Conditions", () => {
-    test("OR condition: users can see own posts OR public posts", async () => {
-      const p = policy("posts_access")
-        .on("posts")
-        .for("SELECT")
-        .when(column("user_id").isOwner().or(column("is_public").isPublic()));
+  describe('Complex Conditions', () => {
+    test('OR condition: users can see own posts OR public posts', async () => {
+      const p = policy('posts_access')
+        .on('posts')
+        .for('SELECT')
+        .when(column('user_id').isOwner().or(column('is_public').isPublic()));
 
       await adminClient.query(p.toSQL());
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       const posts = await user1Client.query(
-        "SELECT id, title, is_public FROM posts ORDER BY title;"
+        'SELECT id, title, is_public FROM posts ORDER BY title;'
       );
       expect(posts.rows).toHaveLength(2); // Own draft + own published + user2's published (if public)
-      expect(posts.rows.map((r) => r.title)).toContain("User1 Draft");
-      expect(posts.rows.map((r) => r.title)).toContain("User1 Published");
+      expect(posts.rows.map((r) => r.title)).toContain('User1 Draft');
+      expect(posts.rows.map((r) => r.title)).toContain('User1 Published');
 
       user1Client.release();
     });
 
-    test("AND condition: users can see own posts with specific status", async () => {
-      const p = policy("posts_draft")
-        .on("posts")
-        .for("SELECT")
-        .when(column("user_id").isOwner().and(column("status").eq("draft")));
+    test('AND condition: users can see own posts with specific status', async () => {
+      const p = policy('posts_draft')
+        .on('posts')
+        .for('SELECT')
+        .when(column('user_id').isOwner().and(column('status').eq('draft')));
 
       await adminClient.query(p.toSQL());
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       const drafts = await user1Client.query(
-        "SELECT id, title, status FROM posts WHERE status = $1;",
-        ["draft"]
+        'SELECT id, title, status FROM posts WHERE status = $1;',
+        ['draft']
       );
       expect(drafts.rows).toHaveLength(1);
-      expect(drafts.rows[0].title).toBe("User1 Draft");
+      expect(drafts.rows[0].title).toBe('User1 Draft');
 
       user1Client.release();
     });
   });
 
-  describe("Membership Conditions", () => {
-    test("users can access projects they are members of", async () => {
+  describe('Membership Conditions', () => {
+    test('users can access projects they are members of', async () => {
       // Need a policy on project_members so the subquery can read it
-      const membersPolicy = policy("project_members_select")
-        .on("project_members")
-        .for("SELECT")
+      const membersPolicy = policy('project_members_select')
+        .on('project_members')
+        .for('SELECT')
         .when(alwaysTrue());
 
-      const p = policy("project_member_access")
-        .on("projects")
-        .for("SELECT")
+      const p = policy('project_member_access')
+        .on('projects')
+        .for('SELECT')
         .when(
-          column("created_by")
+          column('created_by')
             .isOwner()
-            .or(column("id").isMemberOf("project_members", "project_id", "id"))
+            .or(column('id').isMemberOf('project_members', 'project_id', 'id'))
         );
 
       const policySQL = p.toSQL();
@@ -670,44 +670,44 @@ describe("RLS Integration Tests", () => {
       await adminClient.query(policySQL);
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       const projects = await user1Client.query(
-        "SELECT id, name FROM projects ORDER BY name;"
+        'SELECT id, name FROM projects ORDER BY name;'
       );
       expect(projects.rows).toHaveLength(2);
       expect(projects.rows.map((r) => r.name)).toEqual([
-        "User1 Project",
-        "User2 Project",
+        'User1 Project',
+        'User2 Project',
       ]);
 
       user1Client.release();
     });
   });
 
-  describe("Role-Based Access", () => {
-    test("users with admin role can access all data", async () => {
-      const adminPolicy = policy("admin_full_access")
-        .on("documents")
-        .for("SELECT")
-        .when(hasRole("admin"));
+  describe('Role-Based Access', () => {
+    test('users with admin role can access all data', async () => {
+      const adminPolicy = policy('admin_full_access')
+        .on('documents')
+        .for('SELECT')
+        .when(hasRole('admin'));
 
-      const userPolicy = policy("user_own_docs")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").isOwner());
+      const userPolicy = policy('user_own_docs')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').isOwner());
 
       await adminClient.query(adminPolicy.toSQL());
       await adminClient.query(userPolicy.toSQL());
 
       const adminClient2 = await pool.connect();
-      await adminClient2.query("SET ROLE authenticated;");
+      await adminClient2.query('SET ROLE authenticated;');
       await setCurrentUser(adminClient2, testData.users.admin);
 
       // Admin should see all documents
       const allDocs = await adminClient2.query(
-        "SELECT id, title FROM documents ORDER BY title;"
+        'SELECT id, title FROM documents ORDER BY title;'
       );
       expect(allDocs.rows).toHaveLength(4);
 
@@ -715,40 +715,40 @@ describe("RLS Integration Tests", () => {
     });
   });
 
-  describe("Policy Groups", () => {
-    test("policy group applies multiple policies correctly", async () => {
-      const group = createPolicyGroup("documents_crud", [
-        policy("documents_select")
-          .on("documents")
-          .for("SELECT")
-          .when(column("user_id").isOwner().or(column("is_public").isPublic())),
-        policy("documents_insert")
-          .on("documents")
-          .for("INSERT")
-          .withCheck(column("user_id").isOwner()),
-        policy("documents_update")
-          .on("documents")
-          .for("UPDATE")
-          .when(column("user_id").isOwner())
-          .withCheck(column("user_id").isOwner()),
+  describe('Policy Groups', () => {
+    test('policy group applies multiple policies correctly', async () => {
+      const group = createPolicyGroup('documents_crud', [
+        policy('documents_select')
+          .on('documents')
+          .for('SELECT')
+          .when(column('user_id').isOwner().or(column('is_public').isPublic())),
+        policy('documents_insert')
+          .on('documents')
+          .for('INSERT')
+          .withCheck(column('user_id').isOwner()),
+        policy('documents_update')
+          .on('documents')
+          .for('UPDATE')
+          .when(column('user_id').isOwner())
+          .withCheck(column('user_id').isOwner()),
       ]);
 
       // Apply all policies from group
       const sql = policyGroupToSQL(group);
-      const statements = sql.split(";").filter((s) => s.trim());
+      const statements = sql.split(';').filter((s) => s.trim());
       for (const statement of statements) {
         if (statement.trim()) {
-          await adminClient.query(statement.trim() + ";");
+          await adminClient.query(statement.trim() + ';');
         }
       }
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       // Test SELECT
       const docs = await user1Client.query(
-        "SELECT id, title FROM documents ORDER BY title;"
+        'SELECT id, title FROM documents ORDER BY title;'
       );
       expect(docs.rows.length).toBeGreaterThan(0);
 
@@ -768,14 +768,14 @@ describe("RLS Integration Tests", () => {
     });
   });
 
-  describe("Session Variables", () => {
-    test("policies work with session variables", async () => {
-      const p = policy("session_based_access")
-        .on("tenant_data")
-        .for("SELECT")
+  describe('Session Variables', () => {
+    test('policies work with session variables', async () => {
+      const p = policy('session_based_access')
+        .on('tenant_data')
+        .for('SELECT')
         .when(
-          column("tenant_id").eq(
-            session.get("app.current_tenant_id", "integer")
+          column('tenant_id').eq(
+            session.get('app.current_tenant_id', 'integer')
           )
         );
 
@@ -783,35 +783,35 @@ describe("RLS Integration Tests", () => {
       await adminClient.query(policySQL);
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       await setTenant(user1Client, 1);
 
-      const data = await user1Client.query("SELECT id, name FROM tenant_data;");
+      const data = await user1Client.query('SELECT id, name FROM tenant_data;');
       expect(data.rows.length).toBeGreaterThan(0);
-      expect(data.rows.every((r) => r.name.includes("Tenant 1"))).toBe(true);
+      expect(data.rows.every((r) => r.name.includes('Tenant 1'))).toBe(true);
 
       user1Client.release();
     });
   });
 
-  describe("Edge Cases", () => {
-    test("users without context cannot access protected data", async () => {
-      const p = policy("protected_docs")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").isOwner());
+  describe('Edge Cases', () => {
+    test('users without context cannot access protected data', async () => {
+      const p = policy('protected_docs')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').isOwner());
 
       await adminClient.query(p.toSQL());
 
       const noAuthClient = await pool.connect();
-      await noAuthClient.query("SET ROLE authenticated;");
+      await noAuthClient.query('SET ROLE authenticated;');
       // Don't set current user
 
       // Should see no documents (or get error if auth.uid() is null)
       try {
-        const docs = await noAuthClient.query("SELECT id FROM documents;");
+        const docs = await noAuthClient.query('SELECT id FROM documents;');
         // If no error, should be empty
         expect(docs.rows).toHaveLength(0);
       } catch (error) {
@@ -822,22 +822,22 @@ describe("RLS Integration Tests", () => {
       noAuthClient.release();
     });
 
-    test("restrictive policies work correctly", async () => {
+    test('restrictive policies work correctly', async () => {
       // Create restrictive tenant policy
-      const restrictivePolicy = policy("restrictive_tenant")
-        .on("tenant_data")
-        .for("ALL")
+      const restrictivePolicy = policy('restrictive_tenant')
+        .on('tenant_data')
+        .for('ALL')
         .restrictive()
         .when(
-          column("tenant_id").eq(
-            session.get("app.current_tenant_id", "integer")
+          column('tenant_id').eq(
+            session.get('app.current_tenant_id', 'integer')
           )
         );
 
       // Create permissive policy (should be blocked by restrictive)
-      const permissivePolicy = policy("permissive_all")
-        .on("tenant_data")
-        .for("SELECT")
+      const permissivePolicy = policy('permissive_all')
+        .on('tenant_data')
+        .for('SELECT')
         .when(alwaysTrue());
 
       const restrictiveSQL = restrictivePolicy.toSQL();
@@ -847,35 +847,35 @@ describe("RLS Integration Tests", () => {
       await adminClient.query(permissiveSQL);
 
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       await setTenant(user1Client, 1);
 
-      const data = await user1Client.query("SELECT id, name FROM tenant_data;");
-      expect(data.rows.every((r) => r.name.includes("Tenant 1"))).toBe(true);
+      const data = await user1Client.query('SELECT id, name FROM tenant_data;');
+      expect(data.rows.every((r) => r.name.includes('Tenant 1'))).toBe(true);
 
       user1Client.release();
     });
   });
 
-  describe("Index Generation", () => {
-    test("indexes are created when includeIndexes is true", async () => {
-      const p = policy("user_docs_select")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").eq(auth.uid()));
+  describe('Index Generation', () => {
+    test('indexes are created when includeIndexes is true', async () => {
+      const p = policy('user_docs_select')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').eq(auth.uid()));
 
       const sql = p.toSQL({ includeIndexes: true });
 
       // Execute the SQL (should contain both policy and index)
       // Split by semicolon and filter out empty statements
       const statements = sql
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       for (const statement of statements) {
-        await adminClient.query(statement + ";");
+        await adminClient.query(statement + ';');
       }
 
       // Verify index was created
@@ -888,16 +888,16 @@ describe("RLS Integration Tests", () => {
       `);
 
       expect(indexResult.rows).toHaveLength(1);
-      expect(indexResult.rows[0].indexname).toBe("idx_documents_user_id");
-      expect(indexResult.rows[0].tablename).toBe("documents");
-      expect(indexResult.rows[0].indexdef).toContain("user_id");
+      expect(indexResult.rows[0].indexname).toBe('idx_documents_user_id');
+      expect(indexResult.rows[0].tablename).toBe('documents');
+      expect(indexResult.rows[0].indexdef).toContain('user_id');
     });
 
-    test("indexes are NOT created when includeIndexes is false", async () => {
-      const p = policy("user_docs_select_no_index")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").eq(auth.uid()));
+    test('indexes are NOT created when includeIndexes is false', async () => {
+      const p = policy('user_docs_select_no_index')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').eq(auth.uid()));
 
       const sql = p.toSQL({ includeIndexes: false });
       await adminClient.query(sql);
@@ -914,11 +914,11 @@ describe("RLS Integration Tests", () => {
       expect(indexResult.rows).toHaveLength(0);
     });
 
-    test("indexes are NOT created when includeIndexes is undefined", async () => {
-      const p = policy("user_docs_select_default")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").eq(auth.uid()));
+    test('indexes are NOT created when includeIndexes is undefined', async () => {
+      const p = policy('user_docs_select_default')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').eq(auth.uid()));
 
       const sql = p.toSQL(); // No options
       await adminClient.query(sql);
@@ -935,19 +935,19 @@ describe("RLS Integration Tests", () => {
       expect(indexResult.rows).toHaveLength(0);
     });
 
-    test("indexes are created for isOwner helper", async () => {
-      const p = policy("user_docs_isowner")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").isOwner());
+    test('indexes are created for isOwner helper', async () => {
+      const p = policy('user_docs_isowner')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').isOwner());
 
       const sql = p.toSQL({ includeIndexes: true });
       const statements = sql
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       for (const statement of statements) {
-        await adminClient.query(statement + ";");
+        await adminClient.query(statement + ';');
       }
 
       // Verify index was created
@@ -962,19 +962,19 @@ describe("RLS Integration Tests", () => {
       expect(indexResult.rows).toHaveLength(1);
     });
 
-    test("indexes are created for tenant isolation", async () => {
-      const p = policy("tenant_data_select")
-        .on("tenant_data")
-        .for("SELECT")
-        .when(column("tenant_id").belongsToTenant());
+    test('indexes are created for tenant isolation', async () => {
+      const p = policy('tenant_data_select')
+        .on('tenant_data')
+        .for('SELECT')
+        .when(column('tenant_id').belongsToTenant());
 
       const sql = p.toSQL({ includeIndexes: true });
       const statements = sql
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       for (const statement of statements) {
-        await adminClient.query(statement + ";");
+        await adminClient.query(statement + ';');
       }
 
       // Verify index was created
@@ -989,21 +989,21 @@ describe("RLS Integration Tests", () => {
       expect(indexResult.rows).toHaveLength(1);
     });
 
-    test("indexes are created for IN clause with subquery", async () => {
+    test('indexes are created for IN clause with subquery', async () => {
       // Need a policy on project_members so the subquery can read it
-      const membersPolicy = policy("project_members_select")
-        .on("project_members")
-        .for("SELECT")
+      const membersPolicy = policy('project_members_select')
+        .on('project_members')
+        .for('SELECT')
         .when(alwaysTrue());
 
-      const p = policy("project_member_access")
-        .on("projects")
-        .for("SELECT")
+      const p = policy('project_member_access')
+        .on('projects')
+        .for('SELECT')
         .when(
-          column("id").in(
-            from("project_members")
-              .select("project_id")
-              .where(column("user_id").eq(auth.uid()))
+          column('id').in(
+            from('project_members')
+              .select('project_id')
+              .where(column('user_id').eq(auth.uid()))
           )
         );
 
@@ -1012,16 +1012,16 @@ describe("RLS Integration Tests", () => {
 
       // Execute both policies - split each separately to handle newlines properly
       const membersStatements = membersSQL
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       const policyStatements = policySQL
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
 
       for (const statement of [...membersStatements, ...policyStatements]) {
-        await adminClient.query(statement + ";");
+        await adminClient.query(statement + ';');
       }
 
       // Verify indexes were created for both tables
@@ -1045,28 +1045,28 @@ describe("RLS Integration Tests", () => {
       expect(membersIndex.rows).toHaveLength(1);
     });
 
-    test("indexes are created for multiple columns in same policy", async () => {
+    test('indexes are created for multiple columns in same policy', async () => {
       // First add the organization_id column to documents table
       await adminClient.query(`
         ALTER TABLE documents ADD COLUMN IF NOT EXISTS organization_id UUID;
       `);
 
-      const p = policy("multi_column_policy")
-        .on("documents")
-        .for("SELECT")
+      const p = policy('multi_column_policy')
+        .on('documents')
+        .for('SELECT')
         .when(
-          column("user_id")
+          column('user_id')
             .eq(auth.uid())
-            .or(column("organization_id").eq(session.get("app.org_id", "uuid")))
+            .or(column('organization_id').eq(session.get('app.org_id', 'uuid')))
         );
 
       const sql = p.toSQL({ includeIndexes: true });
       const statements = sql
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       for (const statement of statements) {
-        await adminClient.query(statement + ";");
+        await adminClient.query(statement + ';');
       }
 
       // Verify both indexes were created
@@ -1090,32 +1090,32 @@ describe("RLS Integration Tests", () => {
       expect(orgIndex.rows).toHaveLength(1);
     });
 
-    test("indexes are created for isMemberOf helper", async () => {
-      const membersPolicy = policy("project_members_select")
-        .on("project_members")
-        .for("SELECT")
+    test('indexes are created for isMemberOf helper', async () => {
+      const membersPolicy = policy('project_members_select')
+        .on('project_members')
+        .for('SELECT')
         .when(alwaysTrue());
 
-      const p = policy("member_projects")
-        .on("projects")
-        .for("SELECT")
-        .when(column("id").isMemberOf("project_members", "project_id"));
+      const p = policy('member_projects')
+        .on('projects')
+        .for('SELECT')
+        .when(column('id').isMemberOf('project_members', 'project_id'));
 
       const membersSQL = membersPolicy.toSQL({ includeIndexes: true });
       const policySQL = p.toSQL({ includeIndexes: true });
 
       // Split each SQL separately to handle newlines properly
       const membersStatements = membersSQL
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       const policyStatements = policySQL
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
 
       for (const statement of [...membersStatements, ...policyStatements]) {
-        await adminClient.query(statement + ";");
+        await adminClient.query(statement + ';');
       }
 
       // Verify indexes were created
@@ -1148,23 +1148,23 @@ describe("RLS Integration Tests", () => {
       expect(membersUserIdIndex.rows).toHaveLength(1);
     });
 
-    test("indexes are created for policy groups", async () => {
-      const group = createPolicyGroup("user_policies", [
-        policy("user_docs")
-          .on("documents")
-          .for("SELECT")
-          .when(column("user_id").eq(auth.uid())),
-        policy("user_posts")
-          .on("posts")
-          .for("SELECT")
-          .when(column("user_id").eq(auth.uid())),
+    test('indexes are created for policy groups', async () => {
+      const group = createPolicyGroup('user_policies', [
+        policy('user_docs')
+          .on('documents')
+          .for('SELECT')
+          .when(column('user_id').eq(auth.uid())),
+        policy('user_posts')
+          .on('posts')
+          .for('SELECT')
+          .when(column('user_id').eq(auth.uid())),
       ]);
 
       const sql = policyGroupToSQL(group, { includeIndexes: true });
-      const statements = sql.split(";").filter((s) => s.trim());
+      const statements = sql.split(';').filter((s) => s.trim());
       for (const statement of statements) {
         if (statement.trim()) {
-          await adminClient.query(statement.trim() + ";");
+          await adminClient.query(statement.trim() + ';');
         }
       }
 
@@ -1189,36 +1189,36 @@ describe("RLS Integration Tests", () => {
       expect(postsIndex.rows).toHaveLength(1);
     });
 
-    test("IF NOT EXISTS prevents duplicate index errors", async () => {
+    test('IF NOT EXISTS prevents duplicate index errors', async () => {
       // Create policy first (without indexes)
-      const p = policy("user_docs_select_if_not_exists")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").eq(auth.uid()));
+      const p = policy('user_docs_select_if_not_exists')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').eq(auth.uid()));
 
       await adminClient.query(p.toSQL());
 
       // Now create the index SQL separately
       const indexSQL = p.toSQL({ includeIndexes: true });
       const statements = indexSQL
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
 
       // Extract only index statements (skip policy creation)
       const indexStatements = statements.filter((s) =>
-        s.toUpperCase().startsWith("CREATE INDEX")
+        s.toUpperCase().startsWith('CREATE INDEX')
       );
 
       // Execute index creation first time
       for (const statement of indexStatements) {
-        await adminClient.query(statement + ";");
+        await adminClient.query(statement + ';');
       }
 
       // Execute index creation second time - should not throw error due to IF NOT EXISTS
       await expect(async () => {
         for (const statement of indexStatements) {
-          await adminClient.query(statement + ";");
+          await adminClient.query(statement + ';');
         }
       }).not.toThrow();
 
@@ -1234,56 +1234,56 @@ describe("RLS Integration Tests", () => {
       expect(indexResult.rows).toHaveLength(1);
     });
 
-    test("policies work correctly with generated indexes", async () => {
-      const p = policy("user_docs_with_index")
-        .on("documents")
-        .for("SELECT")
-        .when(column("user_id").eq(auth.uid()));
+    test('policies work correctly with generated indexes', async () => {
+      const p = policy('user_docs_with_index')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').eq(auth.uid()));
 
-      const sql = p     .toSQL({ includeIndexes: true });
+      const sql = p.toSQL({ includeIndexes: true });
       const statements = sql
-        .split(";")
+        .split(';')
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
       for (const statement of statements) {
-        await adminClient.query(statement + ";");
+        await adminClient.query(statement + ';');
       }
 
       // Test that policy still works correctly
       const user1Client = await pool.connect();
-      await user1Client.query("SET ROLE authenticated;");
+      await user1Client.query('SET ROLE authenticated;');
       await setCurrentUser(user1Client, testData.users.user1);
 
       const user1Docs = await user1Client.query(
-        "SELECT id, title FROM documents ORDER BY title;"
+        'SELECT id, title FROM documents ORDER BY title;'
       );
       expect(user1Docs.rows).toHaveLength(2);
       expect(user1Docs.rows.map((r) => r.title)).toEqual([
-        "User1 Private Doc",
-        "User1 Public Doc",
+        'User1 Private Doc',
+        'User1 Public Doc',
       ]);
 
       user1Client.release();
     });
   });
 
-  describe("Index Generation with Joins", () => {
-    test("indexes are created for columns in join conditions", () => {
+  describe('Index Generation with Joins', () => {
+    test('indexes are created for columns in join conditions', () => {
       // Create a policy with a subquery that has a join
-      const p = policy("org_documents_access")
-        .on("documents")
-        .for("SELECT")
+      const p = policy('org_documents_access')
+        .on('documents')
+        .for('SELECT')
         .when(
-          column("id").in(
-            from("organizations", "org")
-              .select("id")
+          column('id').in(
+            from('organizations', 'org')
+              .select('id')
               .join(
-                "organization_members",
-                column("org.id").eq("organization_members.organization_id"),
-                "inner",
-                "om"
+                'organization_members',
+                column('org.id').eq('organization_members.organization_id'),
+                'inner',
+                'om'
               )
-              .where(column("om.user_id").eq(auth.uid()))
+              .where(column('om.user_id').eq(auth.uid()))
           )
         );
 
@@ -1296,35 +1296,35 @@ describe("RLS Integration Tests", () => {
       // 4. organization_members.user_id (used in WHERE clause)
 
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_documents_id ON documents (id)"
+        'CREATE INDEX IF NOT EXISTS idx_documents_id ON documents (id)'
       );
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_organizations_id ON organizations (id)"
+        'CREATE INDEX IF NOT EXISTS idx_organizations_id ON organizations (id)'
       );
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_organization_members_organization_id ON organization_members (organization_id)"
+        'CREATE INDEX IF NOT EXISTS idx_organization_members_organization_id ON organization_members (organization_id)'
       );
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_organization_members_user_id ON organization_members (user_id)"
+        'CREATE INDEX IF NOT EXISTS idx_organization_members_user_id ON organization_members (user_id)'
       );
     });
 
-    test("indexes are created for join conditions with table aliases", () => {
+    test('indexes are created for join conditions with table aliases', () => {
       // Create a policy with a subquery that has a join using aliases
-      const p = policy("joined_projects_access")
-        .on("projects")
-        .for("SELECT")
+      const p = policy('joined_projects_access')
+        .on('projects')
+        .for('SELECT')
         .when(
-          column("id").in(
-            from("projects", "p")
-              .select("id")
+          column('id').in(
+            from('projects', 'p')
+              .select('id')
               .join(
-                "project_members",
-                column("p.id").eq("pm.project_id"),
-                "inner",
-                "pm"
+                'project_members',
+                column('p.id').eq('pm.project_id'),
+                'inner',
+                'pm'
               )
-              .where(column("pm.user_id").eq(auth.uid()))
+              .where(column('pm.user_id').eq(auth.uid()))
           )
         );
 
@@ -1332,32 +1332,32 @@ describe("RLS Integration Tests", () => {
 
       // Verify indexes are generated for join condition columns (using actual table names, not aliases)
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_projects_id ON projects (id)"
+        'CREATE INDEX IF NOT EXISTS idx_projects_id ON projects (id)'
       );
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON project_members (project_id)"
+        'CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON project_members (project_id)'
       );
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_project_members_user_id ON project_members (user_id)"
+        'CREATE INDEX IF NOT EXISTS idx_project_members_user_id ON project_members (user_id)'
       );
     });
 
-    test("indexes are created for left join conditions", () => {
+    test('indexes are created for left join conditions', () => {
       // Create a policy with a LEFT JOIN
-      const p = policy("left_join_access")
-        .on("documents")
-        .for("SELECT")
+      const p = policy('left_join_access')
+        .on('documents')
+        .for('SELECT')
         .when(
-          column("id").in(
-            from("organizations", "org")
-              .select("id")
+          column('id').in(
+            from('organizations', 'org')
+              .select('id')
               .join(
-                "organization_members",
-                column("org.id").eq("organization_members.organization_id"),
-                "left",
-                "om"
+                'organization_members',
+                column('org.id').eq('organization_members.organization_id'),
+                'left',
+                'om'
               )
-              .where(column("om.user_id").eq(auth.uid()))
+              .where(column('om.user_id').eq(auth.uid()))
           )
         );
 
@@ -1365,32 +1365,32 @@ describe("RLS Integration Tests", () => {
 
       // Verify indexes are generated for join condition (works for all join types)
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_organizations_id ON organizations (id)"
+        'CREATE INDEX IF NOT EXISTS idx_organizations_id ON organizations (id)'
       );
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_organization_members_organization_id ON organization_members (organization_id)"
+        'CREATE INDEX IF NOT EXISTS idx_organization_members_organization_id ON organization_members (organization_id)'
       );
     });
 
-    test("indexes are created for complex join conditions with multiple columns", () => {
+    test('indexes are created for complex join conditions with multiple columns', () => {
       // Create a policy with a join condition that uses multiple column comparisons
       // Note: This tests that join conditions are properly processed
-      const p = policy("complex_join_access")
-        .on("projects")
-        .for("SELECT")
+      const p = policy('complex_join_access')
+        .on('projects')
+        .for('SELECT')
         .when(
-          column("id").in(
-            from("projects", "p")
-              .select("id")
+          column('id').in(
+            from('projects', 'p')
+              .select('id')
               .join(
-                "project_members",
-                column("p.id")
-                  .eq("pm.project_id")
-                  .and(column("p.status").eq("active")),
-                "inner",
-                "pm"
+                'project_members',
+                column('p.id')
+                  .eq('pm.project_id')
+                  .and(column('p.status').eq('active')),
+                'inner',
+                'pm'
               )
-              .where(column("pm.user_id").eq(auth.uid()))
+              .where(column('pm.user_id').eq(auth.uid()))
           )
         );
 
@@ -1399,30 +1399,30 @@ describe("RLS Integration Tests", () => {
       // Verify indexes are generated for join condition columns
       // The join condition has p.id = pm.project_id, so both should be indexed
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_projects_id ON projects (id)"
+        'CREATE INDEX IF NOT EXISTS idx_projects_id ON projects (id)'
       );
       expect(sql).toContain(
-        "CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON project_members (project_id)"
+        'CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON project_members (project_id)'
       );
     });
 
-    test("indexes for joins use actual table names not aliases", () => {
+    test('indexes for joins use actual table names not aliases', () => {
       // Verify that indexes generated for join conditions use actual table names,
       // not the aliases used in the subquery
-      const p = policy("org_docs_policy")
-        .on("documents")
-        .for("SELECT")
+      const p = policy('org_docs_policy')
+        .on('documents')
+        .for('SELECT')
         .when(
-          column("id").in(
-            from("organizations", "org")
-              .select("id")
+          column('id').in(
+            from('organizations', 'org')
+              .select('id')
               .join(
-                "organization_members",
-                column("org.id").eq("organization_members.organization_id"),
-                "inner",
-                "om"
+                'organization_members',
+                column('org.id').eq('organization_members.organization_id'),
+                'inner',
+                'om'
               )
-              .where(column("om.user_id").eq(auth.uid()))
+              .where(column('om.user_id').eq(auth.uid()))
           )
         );
 
@@ -1430,19 +1430,19 @@ describe("RLS Integration Tests", () => {
 
       // Verify that indexes use actual table names (organizations, organization_members)
       // not aliases (org, om)
-      expect(sql).toContain("idx_organizations_id ON organizations");
+      expect(sql).toContain('idx_organizations_id ON organizations');
       expect(sql).toContain(
-        "idx_organization_members_organization_id ON organization_members"
+        'idx_organization_members_organization_id ON organization_members'
       );
       expect(sql).toContain(
-        "idx_organization_members_user_id ON organization_members"
+        'idx_organization_members_user_id ON organization_members'
       );
 
       // Verify aliases are NOT used in index creation
-      expect(sql).not.toContain("idx_org_");
-      expect(sql).not.toContain("idx_om_");
-      expect(sql).not.toContain("ON org (");
-      expect(sql).not.toContain("ON om (");
+      expect(sql).not.toContain('idx_org_');
+      expect(sql).not.toContain('idx_om_');
+      expect(sql).not.toContain('ON org (');
+      expect(sql).not.toContain('ON om (');
     });
   });
 });

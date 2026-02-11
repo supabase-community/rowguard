@@ -13,20 +13,8 @@
   },
   "includeVersion": true,
   "sort": ["source-order"],
-  "kindSortOrder": [
-    "Function",
-    "Class",
-    "Interface",
-    "TypeAlias",
-    "Enum"
-  ],
+  "kindSortOrder": ["Function", "Class", "Interface", "TypeAlias", "Enum"],
   "categorizeByGroup": true,
-  "categoryOrder": [
-    "Policy Builder",
-    "Conditions",
-    "Context",
-    "Types",
-    "*"
-  ],
+  "categoryOrder": ["Policy Builder", "Conditions", "Context", "Types", "*"],
   "basePath": "/rowguard/"
 }

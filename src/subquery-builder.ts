@@ -2,9 +2,9 @@
  * Fluent subquery builder API for declarative subquery construction
  */
 
-import { Condition, SubqueryDefinition, JoinDefinition } from "./types";
-import { ConditionChain } from "./column";
-import { detectMissingJoins, getAvailableTables } from "./validation";
+import { Condition, SubqueryDefinition, JoinDefinition } from './types';
+import { ConditionChain } from './column';
+import { detectMissingJoins, getAvailableTables } from './validation';
 
 function validateTableReferences(
   condition: Condition,
@@ -24,11 +24,11 @@ function validateTableReferences(
     if (filteredMissing.length > 0) {
       if (allowedMissing) {
         throw new Error(
-          `Join condition references unavailable table(s): ${filteredMissing.join(", ")}`
+          `Join condition references unavailable table(s): ${filteredMissing.join(', ')}`
         );
       } else {
         throw new Error(
-          `Missing join(s) for table(s): ${filteredMissing.join(", ")}. ` +
+          `Missing join(s) for table(s): ${filteredMissing.join(', ')}. ` +
             `Add a join using .join('${filteredMissing[0]}', ...) before calling .where()`
         );
       }
@@ -39,13 +39,13 @@ function validateTableReferences(
 export class SubqueryBuilder {
   private _from: string;
   private _fromAlias?: string;
-  private _select: string | string[] = "*";
+  private _select: string | string[] = '*';
   private _where?: Condition;
   private _joins: Array<{
     table: string;
     alias?: string;
     on: Condition;
-    type?: "inner" | "left" | "right" | "full";
+    type?: 'inner' | 'left' | 'right' | 'full';
   }> = [];
 
   constructor(from: string, alias?: string) {
@@ -95,9 +95,7 @@ export class SubqueryBuilder {
    */
   where(condition: Condition | ConditionChain): this {
     const normalizedCondition =
-      condition instanceof ConditionChain
-        ? condition.toCondition()
-        : condition;
+      condition instanceof ConditionChain ? condition.toCondition() : condition;
 
     validateTableReferences(
       normalizedCondition,
@@ -145,11 +143,10 @@ export class SubqueryBuilder {
   join(
     table: string,
     on: Condition | ConditionChain,
-    type?: "inner" | "left" | "right" | "full",
+    type?: 'inner' | 'left' | 'right' | 'full',
     alias?: string
   ): this {
-    const normalizedOn =
-      on instanceof ConditionChain ? on.toCondition() : on;
+    const normalizedOn = on instanceof ConditionChain ? on.toCondition() : on;
 
     validateTableReferences(
       normalizedOn,
@@ -163,7 +160,7 @@ export class SubqueryBuilder {
       table,
       alias,
       on: normalizedOn,
-      type: type || "inner",
+      type: type || 'inner',
     });
 
     return this;

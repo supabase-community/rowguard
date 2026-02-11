@@ -2,7 +2,16 @@
  * Validation utilities for detecting table references and missing joins
  */
 
-import { Condition, ComparisonCondition, LogicalCondition, PatternCondition, NullCondition, MembershipCondition, HelperCondition, FunctionCondition } from "./types";
+import {
+  Condition,
+  ComparisonCondition,
+  LogicalCondition,
+  PatternCondition,
+  NullCondition,
+  MembershipCondition,
+  HelperCondition,
+  FunctionCondition,
+} from './types';
 
 /**
  * Extract table name from a column reference
@@ -39,7 +48,7 @@ export function extractTableReferences(condition: Condition): Set<string> {
 
   function traverse(cond: Condition): void {
     switch (cond.type) {
-      case "comparison": {
+      case 'comparison': {
         const comp = cond as ComparisonCondition;
         // Check the column
         const table = extractTableFromColumn(comp.column);
@@ -47,12 +56,16 @@ export function extractTableReferences(condition: Condition): Set<string> {
           tables.add(table);
         }
         // Check the value if it's a condition
-        if (comp.value && typeof comp.value === "object" && "toSQL" in comp.value) {
+        if (
+          comp.value &&
+          typeof comp.value === 'object' &&
+          'toSQL' in comp.value
+        ) {
           traverse(comp.value as Condition);
         }
         break;
       }
-      case "pattern": {
+      case 'pattern': {
         const pattern = cond as PatternCondition;
         const table = extractTableFromColumn(pattern.column);
         if (table) {
@@ -60,7 +73,7 @@ export function extractTableReferences(condition: Condition): Set<string> {
         }
         break;
       }
-      case "null": {
+      case 'null': {
         const nullCond = cond as NullCondition;
         const table = extractTableFromColumn(nullCond.column);
         if (table) {
@@ -68,12 +81,12 @@ export function extractTableReferences(condition: Condition): Set<string> {
         }
         break;
       }
-      case "logical": {
+      case 'logical': {
         const logical = cond as LogicalCondition;
         logical.conditions.forEach(traverse);
         break;
       }
-      case "membership": {
+      case 'membership': {
         // Membership conditions have column references
         const membership = cond as MembershipCondition;
         if (membership.column) {
@@ -84,13 +97,13 @@ export function extractTableReferences(condition: Condition): Set<string> {
         }
         break;
       }
-      case "helper": {
+      case 'helper': {
         // Helper conditions might have table references in params
         const helper = cond as HelperCondition;
         if (helper.params) {
           // Check if params contain column references
           Object.values(helper.params).forEach((value) => {
-            if (typeof value === "string") {
+            if (typeof value === 'string') {
               const table = extractTableFromColumn(value);
               if (table) {
                 tables.add(table);
@@ -100,17 +113,17 @@ export function extractTableReferences(condition: Condition): Set<string> {
         }
         break;
       }
-      case "function": {
+      case 'function': {
         // Function conditions might have column references in arguments
         const func = cond as FunctionCondition;
         if (func.arguments) {
           func.arguments.forEach((arg) => {
-            if (typeof arg === "string") {
+            if (typeof arg === 'string') {
               const table = extractTableFromColumn(arg);
               if (table) {
                 tables.add(table);
               }
-            } else if (arg && typeof arg === "object" && "toSQL" in arg) {
+            } else if (arg && typeof arg === 'object' && 'toSQL' in arg) {
               traverse(arg as Condition);
             }
           });

@@ -1,19 +1,22 @@
 # Rowguard - RLS Policy DSL
 
+[![npm version](https://img.shields.io/npm/v/rowguard.svg?style=flat-square)](https://www.npmjs.com/package/rowguard)
 [![Docs](https://img.shields.io/badge/docs-API%20Reference-blue?logo=readthedocs)](https://supabase-community.github.io/rowguard/)
-[![License](https://img.shields.io/npm/l/nx.svg?style=flat-square)](./LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](./LICENSE)
 [![pkg.pr.new](https://pkg.pr.new/badge/supabase-community/rowguard)](https://pkg.pr.new/~/supabase-community/rowguard)
 
 A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies with a clean, type-safe API.
 
-> **⚠️ Experimental:** This is an experimental project and not an official Supabase library. It is not published to npm. Test builds are available via [pkg-pr-new](https://pkg.pr.new) for evaluation purposes only.
-> **⚠️ No Performance Evaluation:** This library does not evaluate the policy performance. You should use Performance Advisory to evaluate the policy performance.
+> **⚠️ Experimental:** This is an experimental project and not an official Supabase library. Use with caution in production.
+>
+> **⚠️ No Performance Evaluation:** This library does not evaluate policy performance. You should use [Supabase Performance Advisor](https://supabase.com/docs/guides/database/performance) to evaluate your RLS policy performance.
 
 ## Interactive Demo
 
 Try the live demo at https://rowguard-demo.vercel.app/
 
 To run the demo locally:
+
 ```bash
 pnpm install
 pnpm demo:dev
@@ -32,11 +35,30 @@ The demo source code is in the [`demo/`](./demo) directory.
 
 ## Installation
 
-This package is not published to npm. Test builds are available via [pkg-pr-new](https://pkg.pr.new) for each PR/commit:
+Install via npm:
 
 ```bash
-# Install a specific commit build (check pkg.pr.new badge for latest URL)
-npm install https://pkg.pr.new/supabase-community/rowguard@{commit-sha}
+npm install rowguard
+```
+
+```bash
+# pnpm
+pnpm add rowguard
+
+# yarn
+yarn add rowguard
+
+# bun
+bun add rowguard
+```
+
+### Testing Unreleased Features
+
+Preview builds are available via [pkg-pr-new](https://pkg.pr.new) for each PR/commit:
+
+```bash
+# Install a preview build from a PR (check pkg.pr.new badge for latest URL)
+npm install https://pkg.pr.new/supabase-community/rowguard@{pr-number}
 ```
 
 ## Quick Start
@@ -55,7 +77,8 @@ const complexPolicy = policy('project_access')
   .on('projects')
   .read()
   .when(
-    column('is_public').eq(true)
+    column('is_public')
+      .eq(true)
       .or(column('user_id').eq(auth.uid()))
       .or(column('organization_id').eq(session.get('app.org_id', 'uuid')))
   );
@@ -85,26 +108,27 @@ const tenantPolicy = policies.tenantIsolation('tenant_data');
 const publicPolicy = policies.publicAccess('projects');
 ```
 
-
 ## User-Focused vs RLS-Focused API
 
 This library provides two API styles:
 
 **User-Focused API (Recommended)** - Uses intuitive terms like `read()`, `write()`, `update()`, `requireAll()`:
+
 ```typescript
 policy('user_docs')
   .on('documents')
-  .read()           // Instead of .for('SELECT')
-  .requireAll()      // Instead of .restrictive()
+  .read() // Instead of .for('SELECT')
+  .requireAll() // Instead of .restrictive()
   .when(column('user_id').isOwner());
 ```
 
 **RLS-Focused API** - Uses PostgreSQL RLS terminology like `for('SELECT')`, `restrictive()`:
+
 ```typescript
 policy('user_docs')
   .on('documents')
-  .for('SELECT')     // RLS terminology
-  .restrictive()     // RLS terminology
+  .for('SELECT') // RLS terminology
+  .restrictive() // RLS terminology
   .when(column('user_id').isOwner());
 ```
 
@@ -141,30 +165,31 @@ policy(name)
 
 ```typescript
 // Comparisons
-column('status').eq('active')
-column('age').gt(18)
-column('price').lte(100)
+column('status').eq('active');
+column('age').gt(18);
+column('price').lte(100);
 
 // Pattern matching
-column('email').like('%@company.com')
-column('name').ilike('john%')
+column('email').like('%@company.com');
+column('name').ilike('john%');
 
 // Membership
-column('status').in(['active', 'pending'])
-column('tags').contains(['important'])
+column('status').in(['active', 'pending']);
+column('tags').contains(['important']);
 
 // Null checks
-column('deleted_at').isNull()
-column('verified_at').isNotNull()
+column('deleted_at').isNull();
+column('verified_at').isNotNull();
 
 // Helpers
-column('user_id').isOwner()      // eq(auth.uid())
-column('is_public').isPublic()   // eq(true)
+column('user_id').isOwner(); // eq(auth.uid())
+column('is_public').isPublic(); // eq(true)
 
 // Chaining
-column('user_id').eq(auth.uid())
+column('user_id')
+  .eq(auth.uid())
   .or(column('is_public').eq(true))
-  .and(column('status').eq('active'))
+  .and(column('status').eq('active'));
 ```
 
 ### Subqueries
@@ -176,7 +201,7 @@ column('id').in(
   from('project_members')
     .select('project_id')
     .where(column('user_id').eq(auth.uid()))
-)
+);
 
 // With joins
 column('id').in(
@@ -184,15 +209,15 @@ column('id').in(
     .select('p.id')
     .join('members', column('m.project_id').eq('p.id'), 'inner', 'm')
     .where(column('m.user_id').eq(auth.uid()))
-)
+);
 ```
 
 ### Context Functions
 
 ```typescript
-auth.uid()                    // Current authenticated user
-session.get(key, type)        // Type-safe session variable
-currentUser()                 // Current database user
+auth.uid(); // Current authenticated user
+session.get(key, type); // Type-safe session variable
+currentUser(); // Current database user
 ```
 
 ### Policy Templates
@@ -257,7 +282,8 @@ policy('project_access')
   .on('projects')
   .read()
   .when(
-    column('user_id').eq(auth.uid())
+    column('user_id')
+      .eq(auth.uid())
       .or(
         column('id').in(
           from('project_members')
@@ -286,19 +312,54 @@ policy('user_documents_update')
   .on('user_documents')
   .update()
   .allow(column('user_id').eq(auth.uid()));
-  // .allow() automatically sets both USING and WITH CHECK for UPDATE
+// .allow() automatically sets both USING and WITH CHECK for UPDATE
 ```
 
+## Contributing
 
+We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details on:
 
-## Development
+- Setting up your development environment
+- Running tests and building the project
+- Code style guidelines
+- How to submit pull requests
+- Testing your changes with preview deployments
+
+### Quick Start for Contributors
 
 ```bash
+# Install dependencies
 pnpm install
+
+# Build the library
 pnpm run build
+
+# Run tests
 pnpm test
+
+# Run integration tests (requires Supabase CLI)
+pnpm run test:integration:full
+
+# Run the interactive demo
+pnpm run demo:dev
 ```
+
+For more detailed information, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## Release Process
+
+This project uses automated releases via [release-please](https://github.com/googleapis/release-please).
+
+- All commits must follow [Conventional Commits](https://www.conventionalcommits.org/) format
+- Releases are automatically published to npm when maintainers merge the release PR
+- For detailed information, see [RELEASE.md](./RELEASE.md)
+
+## Documentation
+
+- **[API Reference](https://supabase-community.github.io/rowguard/)** - Full API documentation
+- **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute to the project
+- **[Release Process](./RELEASE.md)** - How releases are managed
 
 ## License
 
-MIT
+MIT - see [LICENSE](./LICENSE) file for details
