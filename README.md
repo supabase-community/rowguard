@@ -16,6 +16,7 @@ A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies with 
 Try the live demo at https://rowguard-demo.vercel.app/
 
 To run the demo locally:
+
 ```bash
 pnpm install
 pnpm demo:dev
@@ -76,7 +77,8 @@ const complexPolicy = policy('project_access')
   .on('projects')
   .read()
   .when(
-    column('is_public').eq(true)
+    column('is_public')
+      .eq(true)
       .or(column('user_id').eq(auth.uid()))
       .or(column('organization_id').eq(session.get('app.org_id', 'uuid')))
   );
@@ -106,26 +108,27 @@ const tenantPolicy = policies.tenantIsolation('tenant_data');
 const publicPolicy = policies.publicAccess('projects');
 ```
 
-
 ## User-Focused vs RLS-Focused API
 
 This library provides two API styles:
 
 **User-Focused API (Recommended)** - Uses intuitive terms like `read()`, `write()`, `update()`, `requireAll()`:
+
 ```typescript
 policy('user_docs')
   .on('documents')
-  .read()           // Instead of .for('SELECT')
-  .requireAll()      // Instead of .restrictive()
+  .read() // Instead of .for('SELECT')
+  .requireAll() // Instead of .restrictive()
   .when(column('user_id').isOwner());
 ```
 
 **RLS-Focused API** - Uses PostgreSQL RLS terminology like `for('SELECT')`, `restrictive()`:
+
 ```typescript
 policy('user_docs')
   .on('documents')
-  .for('SELECT')     // RLS terminology
-  .restrictive()     // RLS terminology
+  .for('SELECT') // RLS terminology
+  .restrictive() // RLS terminology
   .when(column('user_id').isOwner());
 ```
 
@@ -162,30 +165,31 @@ policy(name)
 
 ```typescript
 // Comparisons
-column('status').eq('active')
-column('age').gt(18)
-column('price').lte(100)
+column('status').eq('active');
+column('age').gt(18);
+column('price').lte(100);
 
 // Pattern matching
-column('email').like('%@company.com')
-column('name').ilike('john%')
+column('email').like('%@company.com');
+column('name').ilike('john%');
 
 // Membership
-column('status').in(['active', 'pending'])
-column('tags').contains(['important'])
+column('status').in(['active', 'pending']);
+column('tags').contains(['important']);
 
 // Null checks
-column('deleted_at').isNull()
-column('verified_at').isNotNull()
+column('deleted_at').isNull();
+column('verified_at').isNotNull();
 
 // Helpers
-column('user_id').isOwner()      // eq(auth.uid())
-column('is_public').isPublic()   // eq(true)
+column('user_id').isOwner(); // eq(auth.uid())
+column('is_public').isPublic(); // eq(true)
 
 // Chaining
-column('user_id').eq(auth.uid())
+column('user_id')
+  .eq(auth.uid())
   .or(column('is_public').eq(true))
-  .and(column('status').eq('active'))
+  .and(column('status').eq('active'));
 ```
 
 ### Subqueries
@@ -197,7 +201,7 @@ column('id').in(
   from('project_members')
     .select('project_id')
     .where(column('user_id').eq(auth.uid()))
-)
+);
 
 // With joins
 column('id').in(
@@ -205,15 +209,15 @@ column('id').in(
     .select('p.id')
     .join('members', column('m.project_id').eq('p.id'), 'inner', 'm')
     .where(column('m.user_id').eq(auth.uid()))
-)
+);
 ```
 
 ### Context Functions
 
 ```typescript
-auth.uid()                    // Current authenticated user
-session.get(key, type)        // Type-safe session variable
-currentUser()                 // Current database user
+auth.uid(); // Current authenticated user
+session.get(key, type); // Type-safe session variable
+currentUser(); // Current database user
 ```
 
 ### Policy Templates
@@ -278,7 +282,8 @@ policy('project_access')
   .on('projects')
   .read()
   .when(
-    column('user_id').eq(auth.uid())
+    column('user_id')
+      .eq(auth.uid())
       .or(
         column('id').in(
           from('project_members')
@@ -307,10 +312,8 @@ policy('user_documents_update')
   .on('user_documents')
   .update()
   .allow(column('user_id').eq(auth.uid()));
-  // .allow() automatically sets both USING and WITH CHECK for UPDATE
+// .allow() automatically sets both USING and WITH CHECK for UPDATE
 ```
-
-
 
 ## Contributing
 

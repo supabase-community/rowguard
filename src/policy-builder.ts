@@ -14,20 +14,20 @@ import type {
   PolicyOperation,
   SQLGenerationOptions,
   SubqueryDefinition,
-} from "./types";
-import { escapeIdentifier, sanitizePolicyName } from "./sql";
-import { ConditionChain, column, hasRole } from "./column";
-import { SubqueryBuilder } from "./subquery-builder";
+} from './types';
+import { escapeIdentifier, sanitizePolicyName } from './sql';
+import { ConditionChain, column, hasRole } from './column';
+import { SubqueryBuilder } from './subquery-builder';
 
 /**
  * Type guard to check if an object has a toCondition method
  */
 function hasToCondition(obj: unknown): obj is { toCondition(): Condition } {
   return (
-    typeof obj === "object" &&
+    typeof obj === 'object' &&
     obj !== null &&
-    "toCondition" in obj &&
-    typeof (obj as { toCondition: unknown }).toCondition === "function"
+    'toCondition' in obj &&
+    typeof (obj as { toCondition: unknown }).toCondition === 'function'
   );
 }
 
@@ -50,10 +50,10 @@ function normalizeCondition(
  */
 function isContextValue(value: unknown): value is ContextValue {
   return (
-    typeof value === "object" &&
+    typeof value === 'object' &&
     value !== null &&
-    "type" in value &&
-    (value as { type: string }).type === "context"
+    'type' in value &&
+    (value as { type: string }).type === 'context'
   );
 }
 
@@ -65,8 +65,8 @@ function parseColumnReference(
   currentTable: string,
   aliasMap: AliasMap
 ): { table: string; column: string } {
-  const parts = columnRef.includes(".")
-    ? columnRef.split(".")
+  const parts = columnRef.includes('.')
+    ? columnRef.split('.')
     : [currentTable, columnRef];
   const table = aliasMap.get(parts[0]) || parts[0];
   return { table, column: parts[1] };
@@ -115,7 +115,7 @@ function processComparisonCondition(
   aliasMap: AliasMap,
   addColumn: ColumnAddFn
 ): void {
-  if (comp.operator !== "eq") return;
+  if (comp.operator !== 'eq') return;
 
   const { table, column } = parseColumnReference(
     comp.column,
@@ -125,14 +125,14 @@ function processComparisonCondition(
 
   const shouldIndex =
     isContextValue(comp.value) ||
-    (typeof comp.value === "object" &&
+    (typeof comp.value === 'object' &&
       comp.value !== null &&
-      "toSQL" in comp.value &&
-      typeof (comp.value as { toSQL(): string }).toSQL === "function");
+      'toSQL' in comp.value &&
+      typeof (comp.value as { toSQL(): string }).toSQL === 'function');
 
   if (shouldIndex) {
     addColumn(table, column);
-  } else if (typeof comp.value === "string" && comp.value.includes(".")) {
+  } else if (typeof comp.value === 'string' && comp.value.includes('.')) {
     addColumn(table, column);
     const rightSide = parseColumnReference(comp.value, currentTable, aliasMap);
     addColumn(rightSide.table, rightSide.column);
@@ -146,7 +146,7 @@ function processMembershipCondition(
   addColumn: ColumnAddFn,
   processCondition: (cond: Condition, table: string) => void
 ): void {
-  if (mem.operator !== "in") return;
+  if (mem.operator !== 'in') return;
 
   const { table, column } = parseColumnReference(
     mem.column,
@@ -159,9 +159,9 @@ function processMembershipCondition(
     const subquery = mem.value.toSubquery();
     processSubqueryForIndexing(subquery, aliasMap, processCondition);
   } else if (
-    typeof mem.value === "object" &&
+    typeof mem.value === 'object' &&
     mem.value !== null &&
-    "from" in mem.value
+    'from' in mem.value
   ) {
     const subquery = mem.value as SubqueryDefinition;
     processSubqueryForIndexing(subquery, aliasMap, processCondition);
@@ -173,17 +173,17 @@ function processHelperCondition(
   currentTable: string,
   addColumn: ColumnAddFn
 ): void {
-  if (helper.helperType === "isMemberOf") {
+  if (helper.helperType === 'isMemberOf') {
     const localKey = helper.params.localKey as string;
-    const localKeyParts = localKey.includes(".")
-      ? localKey.split(".")
+    const localKeyParts = localKey.includes('.')
+      ? localKey.split('.')
       : [currentTable, localKey];
     addColumn(localKeyParts[0], localKeyParts[1]);
 
     const joinTable = helper.params.joinTable as string;
     const foreignKey = helper.params.foreignKey as string;
     addColumn(joinTable, foreignKey);
-    addColumn(joinTable, "user_id");
+    addColumn(joinTable, 'user_id');
   }
 }
 
@@ -208,7 +208,7 @@ function extractIndexableColumns(
 
   function processCondition(cond: Condition, currentTable: string): void {
     switch (cond.type) {
-      case "comparison":
+      case 'comparison':
         processComparisonCondition(
           cond as ComparisonCondition,
           currentTable,
@@ -217,7 +217,7 @@ function extractIndexableColumns(
         );
         break;
 
-      case "membership":
+      case 'membership':
         processMembershipCondition(
           cond as MembershipCondition,
           currentTable,
@@ -227,15 +227,15 @@ function extractIndexableColumns(
         );
         break;
 
-      case "logical":
+      case 'logical':
         (cond as LogicalCondition).conditions.forEach((c) =>
           processCondition(c, currentTable)
         );
         break;
 
-      case "subquery": {
+      case 'subquery': {
         const subqueryCond = cond as unknown as {
-          type: "subquery";
+          type: 'subquery';
           column: string;
           subquery: SubqueryDefinition;
         };
@@ -253,7 +253,7 @@ function extractIndexableColumns(
         break;
       }
 
-      case "helper":
+      case 'helper':
         processHelperCondition(
           cond as HelperCondition,
           currentTable,
@@ -327,7 +327,7 @@ export class PolicyBuilder {
    * ```
    */
   read(): this {
-    return this.for("SELECT");
+    return this.for('SELECT');
   }
 
   /**
@@ -342,7 +342,7 @@ export class PolicyBuilder {
    * ```
    */
   write(): this {
-    return this.for("INSERT");
+    return this.for('INSERT');
   }
 
   /**
@@ -358,7 +358,7 @@ export class PolicyBuilder {
    * ```
    */
   update(): this {
-    return this.for("UPDATE");
+    return this.for('UPDATE');
   }
 
   /**
@@ -373,7 +373,7 @@ export class PolicyBuilder {
    * ```
    */
   delete(): this {
-    return this.for("DELETE");
+    return this.for('DELETE');
   }
 
   /**
@@ -388,7 +388,7 @@ export class PolicyBuilder {
    * ```
    */
   all(): this {
-    return this.for("ALL");
+    return this.for('ALL');
   }
 
   /**
@@ -484,21 +484,23 @@ export class PolicyBuilder {
     const operation = this.state.operation;
 
     if (!operation) {
-      throw new Error("Must call .for(), .read(), .write(), .update(), .delete(), or .all() before .allow()");
+      throw new Error(
+        'Must call .for(), .read(), .write(), .update(), .delete(), or .all() before .allow()'
+      );
     }
 
     const normalizedCondition = normalizeCondition(condition);
 
     // SELECT and DELETE only need USING (read filter)
-    if (operation === "SELECT" || operation === "DELETE") {
+    if (operation === 'SELECT' || operation === 'DELETE') {
       this.state.using = normalizedCondition;
     }
     // INSERT only needs WITH CHECK (write validation)
-    else if (operation === "INSERT") {
+    else if (operation === 'INSERT') {
       this.state.withCheck = normalizedCondition;
     }
     // UPDATE and ALL need both USING and WITH CHECK
-    else if (operation === "UPDATE" || operation === "ALL") {
+    else if (operation === 'UPDATE' || operation === 'ALL') {
       this.state.using = normalizedCondition;
       this.state.withCheck = normalizedCondition;
     }
@@ -510,7 +512,7 @@ export class PolicyBuilder {
    * Set policy as RESTRICTIVE
    */
   restrictive(): this {
-    this.state.type = "RESTRICTIVE";
+    this.state.type = 'RESTRICTIVE';
     return this;
   }
 
@@ -518,7 +520,7 @@ export class PolicyBuilder {
    * Set policy as PERMISSIVE (default)
    */
   permissive(): this {
-    this.state.type = "PERMISSIVE";
+    this.state.type = 'PERMISSIVE';
     return this;
   }
 
@@ -588,15 +590,15 @@ export class PolicyBuilder {
    */
   private generatePolicyName(): string {
     if (!this.state.table) {
-      throw new Error("Cannot generate policy name: table is required");
+      throw new Error('Cannot generate policy name: table is required');
     }
     if (!this.state.operation) {
-      throw new Error("Cannot generate policy name: operation is required");
+      throw new Error('Cannot generate policy name: operation is required');
     }
 
     const table = this.state.table;
     const operation = this.state.operation.toLowerCase();
-    const isRestrictive = this.state.type === "RESTRICTIVE";
+    const isRestrictive = this.state.type === 'RESTRICTIVE';
 
     if (isRestrictive) {
       return `${table}_${operation}_restrictive_policy`;
@@ -609,10 +611,10 @@ export class PolicyBuilder {
    */
   toDefinition(): PolicyDefinition {
     if (!this.state.table) {
-      throw new Error("Policy table is required");
+      throw new Error('Policy table is required');
     }
     if (!this.state.operation) {
-      throw new Error("Policy operation is required");
+      throw new Error('Policy operation is required');
     }
 
     // Use provided name or auto-generate one
@@ -625,7 +627,7 @@ export class PolicyBuilder {
       table: this.state.table,
       operation: this.state.operation,
       role: this.state.role,
-      type: this.state.type || "PERMISSIVE",
+      type: this.state.type || 'PERMISSIVE',
       using: this.state.using,
       withCheck: this.state.withCheck,
       description: this.state.description,
@@ -645,8 +647,8 @@ export class PolicyBuilder {
     parts.push(`CREATE POLICY ${escapeIdentifier(def.name)}`);
     parts.push(`ON ${escapeIdentifier(def.table)}`);
 
-    if (def.type === "RESTRICTIVE") {
-      parts.push("AS RESTRICTIVE");
+    if (def.type === 'RESTRICTIVE') {
+      parts.push('AS RESTRICTIVE');
     }
 
     parts.push(`FOR ${def.operation}`);
@@ -663,7 +665,7 @@ export class PolicyBuilder {
       parts.push(`WITH CHECK (${def.withCheck.toSQL()})`);
     }
 
-    const policySQL = parts.join(" ");
+    const policySQL = parts.join(' ');
 
     // Generate indexes if requested
     if (options?.includeIndexes) {
@@ -693,7 +695,7 @@ export class PolicyBuilder {
 
       if (tableColumns.size > 0) {
         const indexSQLs = generateIndexSQL(tableColumns);
-        return `${policySQL};\n\n${indexSQLs.join("\n")}`;
+        return `${policySQL};\n\n${indexSQLs.join('\n')}`;
       }
     }
 
@@ -734,7 +736,6 @@ export function policy(name?: string): PolicyBuilder {
   return new PolicyBuilder(name);
 }
 
-
 /**
  * Policy template helpers for common patterns
  */
@@ -765,31 +766,29 @@ export const policies = {
    */
   userOwned(
     table: string,
-    operations: PolicyOperation | PolicyOperation[] = "ALL",
-    userIdColumn: string = "user_id"
+    operations: PolicyOperation | PolicyOperation[] = 'ALL',
+    userIdColumn: string = 'user_id'
   ): PolicyBuilder[] {
     const ops = Array.isArray(operations) ? operations : [operations];
 
     return ops.map((op) => {
-      const p = policy(`${table}_${op.toLowerCase()}_owner`)
-        .on(table)
-        .for(op);
+      const p = policy(`${table}_${op.toLowerCase()}_owner`).on(table).for(op);
 
       // SELECT and DELETE need USING (read filter)
       if (
-        op === "SELECT" ||
-        op === "DELETE" ||
-        op === "UPDATE" ||
-        op === "ALL"
+        op === 'SELECT' ||
+        op === 'DELETE' ||
+        op === 'UPDATE' ||
+        op === 'ALL'
       ) {
         p.when(column(userIdColumn).isOwner());
       }
       // INSERT, UPDATE, and DELETE need WITH CHECK (write validation)
       if (
-        op === "INSERT" ||
-        op === "UPDATE" ||
-        op === "DELETE" ||
-        op === "ALL"
+        op === 'INSERT' ||
+        op === 'UPDATE' ||
+        op === 'DELETE' ||
+        op === 'ALL'
       ) {
         p.withCheck(column(userIdColumn).isOwner());
       }
@@ -829,12 +828,12 @@ export const policies = {
    */
   tenantIsolation(
     table: string,
-    tenantColumn: string = "tenant_id",
-    sessionKey: string = "app.current_tenant_id"
+    tenantColumn: string = 'tenant_id',
+    sessionKey: string = 'app.current_tenant_id'
   ): PolicyBuilder {
     return policy(`${table}_tenant_isolation`)
       .on(table)
-      .for("ALL")
+      .for('ALL')
       .restrictive()
       .when(column(tenantColumn).belongsToTenant(sessionKey));
   },
@@ -865,11 +864,11 @@ export const policies = {
    */
   publicAccess(
     table: string,
-    visibilityColumn: string = "is_public"
+    visibilityColumn: string = 'is_public'
   ): PolicyBuilder {
     return policy(`${table}_public_access`)
       .on(table)
-      .for("SELECT")
+      .for('SELECT')
       .when(column(visibilityColumn).isPublic());
   },
 
@@ -900,7 +899,7 @@ export const policies = {
   roleAccess(
     table: string,
     role: string,
-    operations: PolicyOperation | PolicyOperation[] = "ALL"
+    operations: PolicyOperation | PolicyOperation[] = 'ALL'
   ): PolicyBuilder[] {
     const ops = Array.isArray(operations) ? operations : [operations];
 

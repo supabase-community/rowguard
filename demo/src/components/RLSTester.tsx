@@ -272,7 +272,8 @@ export default function RLSTester() {
                 Rowguard - RLS Policy DSL Tester
               </h1>
               <p className="text-text-secondary">
-                Test and generate PostgreSQL Row Level Security policies with TypeScript
+                Test and generate PostgreSQL Row Level Security policies with
+                TypeScript
               </p>
             </div>
             <a
@@ -287,7 +288,9 @@ export default function RLSTester() {
         </header>
 
         <div className="mb-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-3">Examples:</h3>
+          <h3 className="text-sm font-semibold text-text-primary mb-3">
+            Examples:
+          </h3>
           <div className="flex flex-wrap gap-2">
             {EXAMPLES.map((example) => (
               <button
@@ -359,7 +362,10 @@ export default function RLSTester() {
             {error ? (
               <div className="flex-1 p-6 min-h-[600px]">
                 <div className="flex items-start gap-3 bg-red-950/50 border border-red-800 rounded-lg p-4">
-                  <AlertCircle className="text-red-400 flex-shrink-0" size={20} />
+                  <AlertCircle
+                    className="text-red-400 flex-shrink-0"
+                    size={20}
+                  />
                   <div>
                     <h3 className="font-semibold text-red-300 mb-1">Error</h3>
                     <p className="text-red-400 text-sm font-mono">{error}</p>
@@ -394,7 +400,9 @@ export default function RLSTester() {
 
         <div className="mt-8 bg-dark-surface rounded-xl shadow-sm border border-dark-border p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-text-primary">Available Functions</h3>
+            <h3 className="font-semibold text-text-primary">
+              Available Functions
+            </h3>
             <a
               href="https://supabase-community.github.io/rowguard/"
               target="_blank"
@@ -406,59 +414,90 @@ export default function RLSTester() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
             <div>
-              <h4 className="font-semibold text-text-primary mb-2">Policy Builder</h4>
+              <h4 className="font-semibold text-text-primary mb-2">
+                Policy Builder
+              </h4>
               <code className="text-xs text-text-secondary block">
-                policy(name)<br />
-                .on(table)<br />
-                .read() | .write()<br />
-                .update() | .delete() | .all()<br />
-                .when(condition)<br />
-                .allow(condition)<br />
+                policy(name)
+                <br />
+                .on(table)
+                <br />
+                .read() | .write()
+                <br />
+                .update() | .delete() | .all()
+                <br />
+                .when(condition)
+                <br />
+                .allow(condition)
+                <br />
                 .toSQL()
               </code>
             </div>
             <div>
-              <h4 className="font-semibold text-text-primary mb-2">Conditions</h4>
+              <h4 className="font-semibold text-text-primary mb-2">
+                Conditions
+              </h4>
               <code className="text-xs text-text-secondary block">
-                column(name).eq(value)<br />
-                .gt() .gte() .lt() .lte()<br />
-                .in() .like() .ilike()<br />
-                .isNull() .isNotNull()<br />
+                column(name).eq(value)
+                <br />
+                .gt() .gte() .lt() .lte()
+                <br />
+                .in() .like() .ilike()
+                <br />
+                .isNull() .isNotNull()
+                <br />
                 .and() .or()
               </code>
             </div>
             <div>
-              <h4 className="font-semibold text-text-primary mb-2">Helper Methods</h4>
+              <h4 className="font-semibold text-text-primary mb-2">
+                Helper Methods
+              </h4>
               <code className="text-xs text-text-secondary block">
-                column(name).isOwner()<br />
-                .isPublic()<br />
-                .belongsToTenant()<br />
+                column(name).isOwner()
+                <br />
+                .isPublic()
+                <br />
+                .belongsToTenant()
+                <br />
                 .isMemberOf(table, key)
               </code>
             </div>
             <div>
               <h4 className="font-semibold text-text-primary mb-2">Context</h4>
               <code className="text-xs text-text-secondary block">
-                auth.uid()<br />
-                session.get(key, type)<br />
+                auth.uid()
+                <br />
+                session.get(key, type)
+                <br />
                 currentUser()
               </code>
             </div>
             <div>
-              <h4 className="font-semibold text-text-primary mb-2">Subqueries</h4>
+              <h4 className="font-semibold text-text-primary mb-2">
+                Subqueries
+              </h4>
               <code className="text-xs text-text-secondary block">
-                from(table)<br />
-                .select(cols)<br />
-                .where(condition)<br />
+                from(table)
+                <br />
+                .select(cols)
+                <br />
+                .where(condition)
+                <br />
                 .join(table, on)
               </code>
             </div>
             <div>
-              <h4 className="font-semibold text-text-primary mb-2">Templates</h4>
+              <h4 className="font-semibold text-text-primary mb-2">
+                Templates
+              </h4>
               <code className="text-xs text-text-secondary block">
-                policies.userOwned()<br />
-                policies.tenantIsolation()<br />
-                policies.publicAccess()<br />
+                policies.userOwned()
+                <br />
+                policies.tenantIsolation()
+                <br />
+                policies.publicAccess()
+                <br />
                 policies.roleAccess()
               </code>
             </div>

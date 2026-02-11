@@ -2,7 +2,7 @@
  * Context helpers for accessing user/auth information
  */
 
-import { ContextValue, SessionVariableType } from "./types";
+import { ContextValue, SessionVariableType } from './types';
 
 /**
  * Auth context helper for accessing authentication information
@@ -54,10 +54,10 @@ export const auth = {
    */
   uid(): ContextValue {
     return {
-      type: "context",
-      contextType: "auth_uid",
+      type: 'context',
+      contextType: 'auth_uid',
       toSQL(): string {
-        return "auth.uid()";
+        return 'auth.uid()';
       },
     };
   },
@@ -115,21 +115,21 @@ export const session = {
    */
   get(key: string, type: SessionVariableType): ContextValue {
     return {
-      type: "context",
-      contextType: "session",
+      type: 'context',
+      contextType: 'session',
       key,
       sessionType: type,
       toSQL(): string {
         const typeCast =
-          type === "integer"
-            ? "::INTEGER"
-            : type === "uuid"
-            ? "::UUID"
-            : type === "boolean"
-            ? "::BOOLEAN"
-            : type === "timestamp"
-            ? "::TIMESTAMP"
-            : "";
+          type === 'integer'
+            ? '::INTEGER'
+            : type === 'uuid'
+              ? '::UUID'
+              : type === 'boolean'
+                ? '::BOOLEAN'
+                : type === 'timestamp'
+                  ? '::TIMESTAMP'
+                  : '';
         return `current_setting('${key}', true)${typeCast}`;
       },
     };
@@ -162,10 +162,10 @@ export const session = {
  */
 export const currentUser = (): ContextValue => {
   return {
-    type: "context",
-    contextType: "current_user",
+    type: 'context',
+    contextType: 'current_user',
     toSQL(): string {
-      return "current_user";
+      return 'current_user';
     },
   };
 };

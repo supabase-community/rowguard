@@ -21,6 +21,7 @@ When you commit to the `main` branch, use [Conventional Commits](https://www.con
 ```
 
 **Types:**
+
 - `feat`: New feature (triggers **minor** version bump)
 - `fix`: Bug fix (triggers **patch** version bump)
 - `docs`: Documentation changes only (no release)
@@ -31,10 +32,12 @@ When you commit to the `main` branch, use [Conventional Commits](https://www.con
 - `ci`: CI/CD configuration changes (no release)
 
 **Breaking changes:**
+
 - Use `feat!:` or `fix!:` for breaking changes (triggers **major** version bump)
 - Or include `BREAKING CHANGE:` in the commit footer
 
 **Examples:**
+
 ```bash
 feat: add support for array operators
 fix: handle null values in column conditions
@@ -87,16 +90,17 @@ Once the release PR is merged, the [release workflow](.github/workflows/release.
 
 We follow [Semantic Versioning](https://semver.org/):
 
-| Commit Type | Version Change | Example |
-|-------------|----------------|---------|
-| `feat:` | Minor | 0.1.0 → 0.2.0 |
-| `fix:`, `perf:` | Patch | 0.1.0 → 0.1.1 |
-| `feat!:`, `fix!:`, `BREAKING CHANGE:` | Major | 0.1.0 → 1.0.0 |
-| `docs:`, `test:`, `chore:`, `refactor:`, `ci:` | None | No release |
+| Commit Type                                    | Version Change | Example       |
+| ---------------------------------------------- | -------------- | ------------- |
+| `feat:`                                        | Minor          | 0.1.0 → 0.2.0 |
+| `fix:`, `perf:`                                | Patch          | 0.1.0 → 0.1.1 |
+| `feat!:`, `fix!:`, `BREAKING CHANGE:`          | Major          | 0.1.0 → 1.0.0 |
+| `docs:`, `test:`, `chore:`, `refactor:`, `ci:` | None           | No release    |
 
 ### Pre-1.0 Behavior
 
 For versions before 1.0.0, the project is configured with:
+
 - `bump-minor-pre-major: true` - `feat:` commits bump minor version (0.1.0 → 0.2.0)
 - `bump-patch-for-minor-pre-major: false` - Breaking changes still bump major (0.x.x → 1.0.0)
 

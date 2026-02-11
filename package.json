@@ -23,6 +23,8 @@
   "scripts": {
     "build": "tsc && dts-bundle-generator -o dist/bundle.d.ts src/index.ts",
     "docs": "typedoc",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "lint": "eslint src tests",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -80,6 +82,7 @@
     "dts-bundle-generator": "^9.5.1",
     "eslint": "^9.39.2",
     "pg": "^8.18.0",
+    "prettier": "3.8.1",
     "typedoc": "^0.28.16",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.55.0",

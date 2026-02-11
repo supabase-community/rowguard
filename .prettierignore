@@ -1,0 +1,24 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+*.tsbuildinfo
+
+# Coverage
+coverage
+
+# Logs
+*.log
+
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# Demo build
+demo/dist

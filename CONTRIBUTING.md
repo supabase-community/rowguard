@@ -163,6 +163,7 @@ pnpm run test:integration:full
 ```
 
 The integration tests:
+
 1. Create real RLS policies in a test database
 2. Test them with actual SQL queries
 3. Verify the generated SQL is valid and functional
@@ -176,6 +177,7 @@ The integration tests:
 - For new features, always add both unit and integration tests
 
 Example test structure:
+
 ```typescript
 import { describe, it, expect } from 'vitest';
 import { policy, column, auth } from '../src';
@@ -242,6 +244,7 @@ Every PR also deploys a preview of the demo site to Vercel:
 3. Share the URL with reviewers to demonstrate new features
 
 This is especially useful for:
+
 - Visual/UI changes in the demo
 - New DSL features that can be demonstrated interactively
 - Getting feedback from non-technical reviewers
@@ -289,7 +292,7 @@ Example:
  *   .when(column('user_id').eq(auth.uid()));
  * ```
  */
-export function policy(name: string): PolicyBuilder
+export function policy(name: string): PolicyBuilder;
 ````
 
 ### Error Handling

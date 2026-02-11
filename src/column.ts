@@ -12,16 +12,16 @@ import {
   HelperCondition,
   FunctionCondition,
   SQLExpression,
-} from "./types";
-import { auth, session } from "./context";
+} from './types';
+import { auth, session } from './context';
 import {
   escapeIdentifier,
   escapeValue,
   subqueryToSQL,
   createComparison,
-} from "./sql";
-import { SubqueryBuilder } from "./subquery-builder";
-import { from } from "./subquery-builder";
+} from './sql';
+import { SubqueryBuilder } from './subquery-builder';
+import { from } from './subquery-builder';
 
 /**
  * Wrapper class that allows chaining conditions with .and() and .or()
@@ -36,15 +36,15 @@ export class ConditionChain {
   private flattenConditions(
     left: Condition,
     right: Condition,
-    operator: "AND" | "OR"
+    operator: 'AND' | 'OR'
   ): Condition[] {
     const leftConditions =
-      left.type === "logical" &&
+      left.type === 'logical' &&
       (left as LogicalCondition).operator === operator
         ? (left as LogicalCondition).conditions
         : [left];
     const rightConditions =
-      right.type === "logical" &&
+      right.type === 'logical' &&
       (right as LogicalCondition).operator === operator
         ? (right as LogicalCondition).conditions
         : [right];
@@ -53,7 +53,7 @@ export class ConditionChain {
 
   private chainWith(
     other: Condition | ConditionChain,
-    operator: "AND" | "OR"
+    operator: 'AND' | 'OR'
   ): ConditionChain {
     const otherCondition =
       other instanceof ConditionChain ? other.toCondition() : other;
@@ -63,7 +63,7 @@ export class ConditionChain {
       operator
     );
     return new ConditionChain({
-      type: "logical",
+      type: 'logical',
       operator,
       conditions: flattened,
       toSQL(): string {
@@ -73,11 +73,11 @@ export class ConditionChain {
   }
 
   and(other: Condition | ConditionChain): ConditionChain {
-    return this.chainWith(other, "AND");
+    return this.chainWith(other, 'AND');
   }
 
   or(other: Condition | ConditionChain): ConditionChain {
-    return this.chainWith(other, "OR");
+    return this.chainWith(other, 'OR');
   }
 
   /**
@@ -121,12 +121,20 @@ export class ColumnBuilder {
    * ```
    */
   eq(
-    value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
   ): ConditionChain {
     const normalizedValue =
       value instanceof ConditionChain ? value.toCondition() : value;
     return new ConditionChain(
-      createComparison(this.columnName, "eq", normalizedValue)
+      createComparison(this.columnName, 'eq', normalizedValue)
     );
   }
 
@@ -140,12 +148,20 @@ export class ColumnBuilder {
    * ```
    */
   neq(
-    value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
   ): ConditionChain {
     const normalizedValue =
       value instanceof ConditionChain ? value.toCondition() : value;
     return new ConditionChain(
-      createComparison(this.columnName, "neq", normalizedValue)
+      createComparison(this.columnName, 'neq', normalizedValue)
     );
   }
 
@@ -160,12 +176,20 @@ export class ColumnBuilder {
    * ```
    */
   gt(
-    value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
   ): ConditionChain {
     const normalizedValue =
       value instanceof ConditionChain ? value.toCondition() : value;
     return new ConditionChain(
-      createComparison(this.columnName, "gt", normalizedValue)
+      createComparison(this.columnName, 'gt', normalizedValue)
     );
   }
 
@@ -179,12 +203,20 @@ export class ColumnBuilder {
    * ```
    */
   gte(
-    value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
   ): ConditionChain {
     const normalizedValue =
       value instanceof ConditionChain ? value.toCondition() : value;
     return new ConditionChain(
-      createComparison(this.columnName, "gte", normalizedValue)
+      createComparison(this.columnName, 'gte', normalizedValue)
     );
   }
 
@@ -198,12 +230,20 @@ export class ColumnBuilder {
    * ```
    */
   lt(
-    value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
   ): ConditionChain {
     const normalizedValue =
       value instanceof ConditionChain ? value.toCondition() : value;
     return new ConditionChain(
-      createComparison(this.columnName, "lt", normalizedValue)
+      createComparison(this.columnName, 'lt', normalizedValue)
     );
   }
 
@@ -217,12 +257,20 @@ export class ColumnBuilder {
    * ```
    */
   lte(
-    value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
   ): ConditionChain {
     const normalizedValue =
       value instanceof ConditionChain ? value.toCondition() : value;
     return new ConditionChain(
-      createComparison(this.columnName, "lte", normalizedValue)
+      createComparison(this.columnName, 'lte', normalizedValue)
     );
   }
 
@@ -239,9 +287,9 @@ export class ColumnBuilder {
   like(pattern: string): ConditionChain {
     const colName = this.columnName;
     return new ConditionChain({
-      type: "pattern",
+      type: 'pattern',
       column: colName,
-      operator: "like",
+      operator: 'like',
       pattern,
       toSQL(): string {
         return `${escapeIdentifier(colName)} LIKE ${escapeValue(pattern)}`;
@@ -261,9 +309,9 @@ export class ColumnBuilder {
   ilike(pattern: string): ConditionChain {
     const colName = this.columnName;
     return new ConditionChain({
-      type: "pattern",
+      type: 'pattern',
       column: colName,
-      operator: "ilike",
+      operator: 'ilike',
       pattern,
       toSQL(): string {
         return `${escapeIdentifier(colName)} ILIKE ${escapeValue(pattern)}`;
@@ -292,13 +340,13 @@ export class ColumnBuilder {
   ): ConditionChain {
     const colName = this.columnName;
     return new ConditionChain({
-      type: "membership",
+      type: 'membership',
       column: colName,
-      operator: "in",
+      operator: 'in',
       value: values,
       toSQL(): string {
         if (Array.isArray(values)) {
-          const valuesList = values.map(escapeValue).join(", ");
+          const valuesList = values.map(escapeValue).join(', ');
           return `${escapeIdentifier(colName)} IN (${valuesList})`;
         } else {
           return `${escapeIdentifier(colName)} IN ${subqueryToSQL(
@@ -332,9 +380,9 @@ export class ColumnBuilder {
   ): ConditionChain {
     const colName = this.columnName;
     return new ConditionChain({
-      type: "membership",
+      type: 'membership',
       column: colName,
-      operator: "contains",
+      operator: 'contains',
       value,
       toSQL(): string {
         return `${escapeIdentifier(colName)} @> ${escapeValue(value)}`;
@@ -357,7 +405,7 @@ export class ColumnBuilder {
   isNull(): ConditionChain {
     const colName = this.columnName;
     return new ConditionChain({
-      type: "null",
+      type: 'null',
       column: colName,
       value: null,
       toSQL(): string {
@@ -381,9 +429,9 @@ export class ColumnBuilder {
   isNotNull(): ConditionChain {
     const colName = this.columnName;
     return new ConditionChain({
-      type: "null",
+      type: 'null',
       column: colName,
-      value: "not null",
+      value: 'not null',
       toSQL(): string {
         return `${escapeIdentifier(colName)} IS NOT NULL`;
       },
@@ -466,9 +514,9 @@ export class ColumnBuilder {
    * ```
    */
   belongsToTenant(
-    sessionKey: string = "app.current_tenant_id"
+    sessionKey: string = 'app.current_tenant_id'
   ): ConditionChain {
-    return this.eq(session.get(sessionKey, "integer"));
+    return this.eq(session.get(sessionKey, 'integer'));
   }
 
   /**
@@ -500,17 +548,17 @@ export class ColumnBuilder {
   isMemberOf(
     joinTable: string,
     foreignKey: string,
-    localKey: string = "id"
+    localKey: string = 'id'
   ): ConditionChain {
     return new ConditionChain({
-      type: "helper",
-      helperType: "isMemberOf",
+      type: 'helper',
+      helperType: 'isMemberOf',
       params: { joinTable, foreignKey, localKey },
       toSQL(): string {
         return `${escapeIdentifier(localKey)} IN (
           SELECT ${escapeIdentifier(foreignKey)}
           FROM ${escapeIdentifier(joinTable)}
-          WHERE ${escapeIdentifier("user_id")} = ${auth.uid().toSQL()}
+          WHERE ${escapeIdentifier('user_id')} = ${auth.uid().toSQL()}
         )`;
       },
     } as HelperCondition);
@@ -530,7 +578,7 @@ export class ColumnBuilder {
     return this.in(
       from(membershipTable)
         .select(selectColumn)
-        .where(column("user_id").eq(auth.uid()))
+        .where(column('user_id').eq(auth.uid()))
     );
   }
 
@@ -560,18 +608,18 @@ export class ColumnBuilder {
  */
 export function hasRole(
   role: string,
-  userRolesTable: string = "user_roles"
+  userRolesTable: string = 'user_roles'
 ): ConditionChain {
   return new ConditionChain({
-    type: "helper",
-    helperType: "hasRole",
+    type: 'helper',
+    helperType: 'hasRole',
     params: { role, userRolesTable },
     toSQL(): string {
       return `EXISTS (
         SELECT 1
         FROM ${escapeIdentifier(userRolesTable)}
-        WHERE ${escapeIdentifier("user_id")} = ${auth.uid().toSQL()}
-        AND ${escapeIdentifier("role")} = ${escapeValue(role)}
+        WHERE ${escapeIdentifier('user_id')} = ${auth.uid().toSQL()}
+        AND ${escapeIdentifier('role')} = ${escapeValue(role)}
       )`;
     },
   } as HelperCondition);
@@ -591,11 +639,11 @@ export function hasRole(
  */
 export function alwaysTrue(): ConditionChain {
   return new ConditionChain({
-    type: "helper",
-    helperType: "alwaysTrue",
+    type: 'helper',
+    helperType: 'alwaysTrue',
     params: {},
     toSQL(): string {
-      return "true";
+      return 'true';
     },
   } as HelperCondition);
 }
@@ -622,15 +670,15 @@ export function call(
     arg instanceof ConditionChain ? arg.toCondition() : arg
   );
   return new ConditionChain({
-    type: "function",
+    type: 'function',
     functionName,
     arguments: normalizedArgs,
     toSQL(): string {
       const argsList = normalizedArgs
         .map((arg) =>
-          typeof arg === "string" ? escapeIdentifier(arg) : arg.toSQL()
+          typeof arg === 'string' ? escapeIdentifier(arg) : arg.toSQL()
         )
-        .join(", ");
+        .join(', ');
       return `${escapeIdentifier(functionName)}(${argsList})`;
     },
   } as FunctionCondition);

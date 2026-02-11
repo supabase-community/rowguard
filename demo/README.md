@@ -6,8 +6,8 @@ An interactive demo application for testing and generating PostgreSQL Row Level 
 
 This demo is located in the `/demo` directory of the main [rowguard repository](https://github.com/supabase-community/rowguard).
 
-* **Live Demo:** https://rowguard-demo.vercel.app/
-* **Documentation:** https://supabase-community.github.io/rowguard/
+- **Live Demo:** https://rowguard-demo.vercel.app/
+- **Documentation:** https://supabase-community.github.io/rowguard/
 
 ## Features
 

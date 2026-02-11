@@ -1,4 +1,10 @@
-import { Condition, SubqueryDefinition, ComparisonCondition, ComparisonOperator, SQLExpression } from "./types";
+import {
+  Condition,
+  SubqueryDefinition,
+  ComparisonCondition,
+  ComparisonOperator,
+  SQLExpression,
+} from './types';
 
 const POSTGRES_MAX_IDENTIFIER_LENGTH = 63;
 
@@ -6,7 +12,7 @@ function simpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash;
   }
   return Math.abs(hash).toString(16).substring(0, 6);
@@ -14,20 +20,22 @@ function simpleHash(str: string): string {
 
 export function sanitizePolicyName(name: string): string {
   if (!name || name.trim().length === 0) {
-    throw new Error("Policy name cannot be empty");
+    throw new Error('Policy name cannot be empty');
   }
 
   let sanitized = name.toLowerCase();
-  sanitized = sanitized.replace(/[^a-z0-9_]/g, "_");
-  sanitized = sanitized.replace(/_+/g, "_");
-  sanitized = sanitized.replace(/^_+|_+$/g, "");
+  sanitized = sanitized.replace(/[^a-z0-9_]/g, '_');
+  sanitized = sanitized.replace(/_+/g, '_');
+  sanitized = sanitized.replace(/^_+|_+$/g, '');
 
   if (/^[0-9]/.test(sanitized)) {
-    sanitized = "_" + sanitized;
+    sanitized = '_' + sanitized;
   }
 
   if (sanitized.length === 0) {
-    throw new Error(`Policy name "${name}" results in an empty identifier after sanitization`);
+    throw new Error(
+      `Policy name "${name}" results in an empty identifier after sanitization`
+    );
   }
 
   if (sanitized.length > POSTGRES_MAX_IDENTIFIER_LENGTH) {
@@ -41,7 +49,7 @@ export function sanitizePolicyName(name: string): string {
 }
 
 // Re-export SQLExpression from types
-export { SQLExpression } from "./types";
+export { SQLExpression } from './types';
 
 export function sql(expression: string): SQLExpression {
   return new SQLExpression(expression);
@@ -63,15 +71,23 @@ export function escapeIdentifier(identifier: string): string {
  * Handles null, boolean, number, Date, string, arrays, SQLExpression, and Condition objects
  */
 export function escapeValue(
-  value: string | number | boolean | Date | null | Condition | SQLExpression | unknown[]
+  value:
+    | string
+    | number
+    | boolean
+    | Date
+    | null
+    | Condition
+    | SQLExpression
+    | unknown[]
 ): string {
   if (value === null) {
-    return "NULL";
+    return 'NULL';
   }
-  if (typeof value === "boolean") {
-    return value ? "TRUE" : "FALSE";
+  if (typeof value === 'boolean') {
+    return value ? 'TRUE' : 'FALSE';
   }
-  if (typeof value === "number") {
+  if (typeof value === 'number') {
     return String(value);
   }
   if (value instanceof Date) {
@@ -82,14 +98,23 @@ export function escapeValue(
   }
   if (Array.isArray(value)) {
     const escapedItems = value.map((item) =>
-      escapeValue(item as string | number | boolean | Date | null | Condition | SQLExpression)
+      escapeValue(
+        item as
+          | string
+          | number
+          | boolean
+          | Date
+          | null
+          | Condition
+          | SQLExpression
+      )
     );
-    return `ARRAY[${escapedItems.join(", ")}]`;
+    return `ARRAY[${escapedItems.join(', ')}]`;
   }
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return `'${value.replace(/'/g, "''")}'`;
   }
-  if (value && typeof value === "object" && "toSQL" in value) {
+  if (value && typeof value === 'object' && 'toSQL' in value) {
     return (value as Condition).toSQL();
   }
   return `'${String(value)}'`;
@@ -104,16 +129,16 @@ export function createComparison(
   value: string | number | boolean | Date | null | Condition | SQLExpression
 ): ComparisonCondition {
   const operatorMap: Record<ComparisonOperator, string> = {
-    eq: "=",
-    neq: "!=",
-    gt: ">",
-    gte: ">=",
-    lt: "<",
-    lte: "<=",
+    eq: '=',
+    neq: '!=',
+    gt: '>',
+    gte: '>=',
+    lt: '<',
+    lte: '<=',
   };
 
   return {
-    type: "comparison",
+    type: 'comparison',
     column,
     operator,
     value,
@@ -130,19 +155,19 @@ export function createComparison(
  */
 export function subqueryToSQL(subquery: SubqueryDefinition): string {
   const from = escapeIdentifier(subquery.from);
-  const alias = subquery.alias ? ` ${escapeIdentifier(subquery.alias)}` : "";
+  const alias = subquery.alias ? ` ${escapeIdentifier(subquery.alias)}` : '';
   const select = Array.isArray(subquery.select)
-    ? subquery.select.map(escapeIdentifier).join(", ")
+    ? subquery.select.map(escapeIdentifier).join(', ')
     : escapeIdentifier(subquery.select);
 
   let sql = `SELECT ${select} FROM ${from}${alias}`;
 
   if (subquery.join) {
-    const joinType = (subquery.join.type || "inner").toUpperCase();
+    const joinType = (subquery.join.type || 'inner').toUpperCase();
     const joinTable = escapeIdentifier(subquery.join.table);
     const joinAlias = subquery.join.alias
       ? ` ${escapeIdentifier(subquery.join.alias)}`
-      : "";
+      : '';
     sql += ` ${joinType} JOIN ${joinTable}${joinAlias} ON ${subquery.join.on.toSQL()}`;
   }
 

@@ -2,24 +2,24 @@
  * Core types and interfaces for Rowguard - RLS Policy DSL
  */
 
-export type PolicyOperation = "SELECT" | "INSERT" | "UPDATE" | "DELETE" | "ALL";
+export type PolicyOperation = 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'ALL';
 
-export type PolicyType = "PERMISSIVE" | "RESTRICTIVE";
+export type PolicyType = 'PERMISSIVE' | 'RESTRICTIVE';
 
-export type ConditionOperator = "AND" | "OR";
+export type ConditionOperator = 'AND' | 'OR';
 
-export type ComparisonOperator = "eq" | "neq" | "gt" | "gte" | "lt" | "lte";
+export type ComparisonOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte';
 
-export type PatternMatchOperator = "like" | "ilike";
+export type PatternMatchOperator = 'like' | 'ilike';
 
-export type NullCheckValue = null | "null" | "not null";
+export type NullCheckValue = null | 'null' | 'not null';
 
 export type SessionVariableType =
-  | "integer"
-  | "text"
-  | "uuid"
-  | "boolean"
-  | "timestamp";
+  | 'integer'
+  | 'text'
+  | 'uuid'
+  | 'boolean'
+  | 'timestamp';
 
 /**
  * Base condition interface that all conditions implement
@@ -48,7 +48,7 @@ export class SQLExpression {
  * Comparison condition (eq, neq, gt, etc.)
  */
 export interface ComparisonCondition extends Condition {
-  type: "comparison";
+  type: 'comparison';
   column: string;
   operator: ComparisonOperator;
   value: string | number | boolean | Date | null | Condition | SQLExpression;
@@ -58,7 +58,7 @@ export interface ComparisonCondition extends Condition {
  * Pattern matching condition (like, ilike)
  */
 export interface PatternCondition extends Condition {
-  type: "pattern";
+  type: 'pattern';
   column: string;
   operator: PatternMatchOperator;
   pattern: string;
@@ -68,9 +68,9 @@ export interface PatternCondition extends Condition {
  * Membership condition (in, contains)
  */
 export interface MembershipCondition extends Condition {
-  type: "membership";
+  type: 'membership';
   column: string;
-  operator: "in" | "contains";
+  operator: 'in' | 'contains';
   value:
     | (string | number | boolean | Date | null)[]
     | SubqueryDefinition
@@ -85,7 +85,7 @@ export interface MembershipCondition extends Condition {
  * Null check condition
  */
 export interface NullCondition extends Condition {
-  type: "null";
+  type: 'null';
   column: string;
   value: NullCheckValue;
 }
@@ -94,7 +94,7 @@ export interface NullCondition extends Condition {
  * Logical operator condition (AND/OR)
  */
 export interface LogicalCondition extends Condition {
-  type: "logical";
+  type: 'logical';
   operator: ConditionOperator;
   conditions: Condition[];
 }
@@ -103,9 +103,9 @@ export interface LogicalCondition extends Condition {
  * Subquery condition
  */
 export interface SubqueryCondition extends Condition {
-  type: "subquery";
+  type: 'subquery';
   column: string;
-  operator: "in" | "not in" | "exists" | "not exists";
+  operator: 'in' | 'not in' | 'exists' | 'not exists';
   subquery: SubqueryDefinition;
 }
 
@@ -113,7 +113,7 @@ export interface SubqueryCondition extends Condition {
  * Function call condition
  */
 export interface FunctionCondition extends Condition {
-  type: "function";
+  type: 'function';
   functionName: string;
   arguments: (string | Condition)[];
 }
@@ -122,7 +122,7 @@ export interface FunctionCondition extends Condition {
  * Helper condition (isOwner, isMemberOf, etc.)
  */
 export interface HelperCondition extends Condition {
-  type: "helper";
+  type: 'helper';
   helperType: string;
   params: Record<string, string | number | boolean | null | undefined>;
 }
@@ -145,7 +145,7 @@ export interface JoinDefinition {
   table: string;
   alias?: string;
   on: Condition;
-  type?: "inner" | "left" | "right" | "full";
+  type?: 'inner' | 'left' | 'right' | 'full';
 }
 
 /**
@@ -190,8 +190,8 @@ export interface PolicyBuilderState {
  * Context value that can be used in conditions
  */
 export interface ContextValue extends Condition {
-  type: "context";
-  contextType: "auth_uid" | "session" | "current_user";
+  type: 'context';
+  contextType: 'auth_uid' | 'session' | 'current_user';
   key?: string;
   sessionType?: SessionVariableType;
 }
