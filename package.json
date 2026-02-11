@@ -36,7 +36,11 @@
     "supabase:status": "supabase status",
     "test:integration:full": "bash scripts/run-integration-tests.sh",
     "prepublishOnly": "pnpm build && pnpm test",
+    "supabase:types": "supabase gen types typescript --local > demo/src/database.types.ts",
+    "supabase:setup": "supabase start && pnpm supabase:types",
+    "supabase:reset": "supabase db reset && pnpm supabase:types",
     "demo:dev": "cd demo && pnpm dev",
+    "demo:dev:full": "pnpm supabase:setup && pnpm demo:dev",
     "demo:build": "pnpm build && cd demo && pnpm build",
     "demo:preview": "cd demo && pnpm preview"
   },

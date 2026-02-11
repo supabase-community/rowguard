@@ -10,42 +10,42 @@ import { Database } from './database.types.example';
 const rg = createRowguard<Database>();
 
 // Example 1: Simple user ownership with autocomplete
-const userNotesPolicy = rg.policy('user_notes')
-  .on('notes')  // ← Autocomplete shows: 'notes' | 'profiles'
+const userNotesPolicy = rg
+  .policy('user_notes')
+  .on('notes') // ← Autocomplete shows: 'notes' | 'profiles'
   .read()
   .when(rg.column('notes', 'user_id').eq(rg.auth.uid()));
-  //             ↑ autocomplete table    ↑ autocomplete columns: 'id' | 'user_id' | 'title' | 'content' | 'created_at'
+//             ↑ autocomplete table    ↑ autocomplete columns: 'id' | 'user_id' | 'title' | 'content' | 'created_at'
 
 console.log('User Notes Policy:');
 console.log(userNotesPolicy.toSQL());
 console.log('');
 
 // Example 2: Complex conditions with OR
-const accessibleNotesPolicy = rg.policy('accessible_notes')
+const accessibleNotesPolicy = rg
+  .policy('accessible_notes')
   .on('notes')
   .read()
-  .when(
-    rg.column('notes', 'user_id').eq(rg.auth.uid())
-  );
+  .when(rg.column('notes', 'user_id').eq(rg.auth.uid()));
 
 console.log('Accessible Notes Policy:');
 console.log(accessibleNotesPolicy.toSQL());
 console.log('');
 
 // Example 3: Type-safe comparisons
-const recentNotesPolicy = rg.policy('recent_notes')
+const recentNotesPolicy = rg
+  .policy('recent_notes')
   .on('notes')
   .read()
-  .when(
-    rg.column('notes', 'user_id').eq(rg.auth.uid())
-  );
+  .when(rg.column('notes', 'user_id').eq(rg.auth.uid()));
 
 console.log('Recent Notes Policy:');
 console.log(recentNotesPolicy.toSQL());
 console.log('');
 
 // Example 4: Null checks
-const activeProfilesPolicy = rg.policy('active_profiles')
+const activeProfilesPolicy = rg
+  .policy('active_profiles')
   .on('profiles')
   .read()
   .when(rg.column('profiles', 'avatar_url').isNotNull());
@@ -55,7 +55,8 @@ console.log(activeProfilesPolicy.toSQL());
 console.log('');
 
 // Example 5: Pattern matching
-const gmailUsersPolicy = rg.policy('gmail_users')
+const gmailUsersPolicy = rg
+  .policy('gmail_users')
   .on('profiles')
   .read()
   .when(rg.column('profiles', 'username').like('%@gmail.com'));
@@ -65,7 +66,8 @@ console.log(gmailUsersPolicy.toSQL());
 console.log('');
 
 // Example 6: INSERT with type-safe validation
-const createNotePolicy = rg.policy('create_note')
+const createNotePolicy = rg
+  .policy('create_note')
   .on('notes')
   .write()
   .allow(rg.column('notes', 'user_id').eq(rg.auth.uid()));
@@ -75,7 +77,8 @@ console.log(createNotePolicy.toSQL());
 console.log('');
 
 // Example 7: UPDATE with both USING and WITH CHECK
-const updateNotePolicy = rg.policy('update_note')
+const updateNotePolicy = rg
+  .policy('update_note')
   .on('notes')
   .update()
   .allow(rg.column('notes', 'user_id').eq(rg.auth.uid()));
@@ -90,4 +93,6 @@ console.log('');
 // ❌ rg.policy('test').on('invalid_table')     // Error: 'invalid_table' is not a table name
 
 console.log('✅ All typed examples compiled successfully!');
-console.log('💡 Try uncommenting the error examples above to see TypeScript catch type mismatches at compile time.');
+console.log(
+  '💡 Try uncommenting the error examples above to see TypeScript catch type mismatches at compile time.'
+);

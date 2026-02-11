@@ -6,7 +6,15 @@
 import { ColumnBuilder, ConditionChain } from './column';
 import { PolicyBuilder } from './policy-builder';
 import { auth, session } from './context';
-import type { ContextValue, SQLExpression, Condition, ComparisonCondition, PatternCondition, MembershipCondition, NullCondition } from './types';
+import type {
+  ContextValue,
+  SQLExpression,
+  Condition,
+  ComparisonCondition,
+  PatternCondition,
+  MembershipCondition,
+  NullCondition,
+} from './types';
 import { SubqueryBuilder } from './subquery-builder';
 import { escapeIdentifier, escapeValue } from './sql';
 
@@ -50,12 +58,11 @@ function createQualifiedComparison(
  * Extract table names from Database type (defaults to 'public' schema)
  * Example: 'notes' | 'profiles' | 'projects'
  */
-export type TableNames<DB> =
-  'public' extends keyof DB
-    ? DB['public'] extends { Tables: infer T }
-      ? keyof T & string
-      : never
-    : never;
+export type TableNames<DB> = 'public' extends keyof DB
+  ? DB['public'] extends { Tables: infer T }
+    ? keyof T & string
+    : never
+  : never;
 
 /**
  * Extract column names for a specific table
@@ -64,7 +71,7 @@ export type TableNames<DB> =
  */
 export type ColumnNames<
   DB,
-  TableName extends TableNames<DB>
+  TableName extends TableNames<DB>,
 > = 'public' extends keyof DB
   ? DB['public'] extends { Tables: infer T }
     ? TableName extends keyof T
@@ -82,7 +89,7 @@ export type ColumnNames<
 export type ColumnType<
   DB,
   TableName extends TableNames<DB>,
-  ColumnName extends ColumnNames<DB, TableName>
+  ColumnName extends ColumnNames<DB, TableName>,
 > = 'public' extends keyof DB
   ? DB['public'] extends { Tables: infer T }
     ? TableName extends keyof T
@@ -113,7 +120,17 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
   /**
    * Equals comparison - value must match column type T
    */
-  eq(value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression): ConditionChain {
+  eq(
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
+  ): ConditionChain {
     return new ConditionChain(
       createQualifiedComparison(this.table, this.col, 'eq', value)
     );
@@ -122,7 +139,17 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
   /**
    * Not equals comparison
    */
-  neq(value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression): ConditionChain {
+  neq(
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
+  ): ConditionChain {
     return new ConditionChain(
       createQualifiedComparison(this.table, this.col, 'neq', value)
     );
@@ -131,7 +158,17 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
   /**
    * Greater than
    */
-  gt(value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression): ConditionChain {
+  gt(
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
+  ): ConditionChain {
     return new ConditionChain(
       createQualifiedComparison(this.table, this.col, 'gt', value)
     );
@@ -140,7 +177,17 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
   /**
    * Greater than or equal
    */
-  gte(value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression): ConditionChain {
+  gte(
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
+  ): ConditionChain {
     return new ConditionChain(
       createQualifiedComparison(this.table, this.col, 'gte', value)
     );
@@ -149,7 +196,17 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
   /**
    * Less than
    */
-  lt(value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression): ConditionChain {
+  lt(
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
+  ): ConditionChain {
     return new ConditionChain(
       createQualifiedComparison(this.table, this.col, 'lt', value)
     );
@@ -158,7 +215,17 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
   /**
    * Less than or equal
    */
-  lte(value: string | number | boolean | Date | null | Condition | ConditionChain | SQLExpression): ConditionChain {
+  lte(
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | Condition
+      | ConditionChain
+      | SQLExpression
+  ): ConditionChain {
     return new ConditionChain(
       createQualifiedComparison(this.table, this.col, 'lte', value)
     );
@@ -201,7 +268,9 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
   /**
    * IN membership check
    */
-  in(values: (string | number | boolean | Date | null)[] | SubqueryBuilder): ConditionChain {
+  in(
+    values: (string | number | boolean | Date | null)[] | SubqueryBuilder
+  ): ConditionChain {
     const table = this.table;
     const col = this.col;
     return new ConditionChain({
@@ -211,7 +280,9 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
       value: values as any,
       toSQL(): string {
         if (Array.isArray(values)) {
-          const valuesList = values.map(v => escapeValue(v as any)).join(', ');
+          const valuesList = values
+            .map((v) => escapeValue(v as any))
+            .join(', ');
           return `${escapeQualifiedIdentifier(table, col)} IN (${valuesList})`;
         } else {
           const subquerySQL = (values as SubqueryBuilder).toSubquery();
@@ -225,7 +296,15 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
   /**
    * Contains operator - for array/JSONB columns
    */
-  contains(value: string | number | boolean | Date | null | (string | number | boolean | Date | null)[]): ConditionChain {
+  contains(
+    value:
+      | string
+      | number
+      | boolean
+      | Date
+      | null
+      | (string | number | boolean | Date | null)[]
+  ): ConditionChain {
     const table = this.table;
     const col = this.col;
     return new ConditionChain({
@@ -280,16 +359,25 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
     return this.eq(true as any);
   }
 
-  belongsToTenant(sessionKey: string = 'app.current_tenant_id'): ConditionChain {
+  belongsToTenant(
+    sessionKey: string = 'app.current_tenant_id'
+  ): ConditionChain {
     return this.eq(session.get(sessionKey, 'integer') as any);
   }
 
   // For methods that need subqueries, we can delegate to parent since they handle the column name properly
-  isMemberOf(joinTable: string, foreignKey: string, localKey?: string): ConditionChain {
+  isMemberOf(
+    joinTable: string,
+    foreignKey: string,
+    localKey?: string
+  ): ConditionChain {
     return super.isMemberOf(joinTable, foreignKey, localKey);
   }
 
-  userBelongsTo(membershipTable: string, membershipColumn?: string): ConditionChain {
+  userBelongsTo(
+    membershipTable: string,
+    membershipColumn?: string
+  ): ConditionChain {
     return super.userBelongsTo(membershipTable, membershipColumn);
   }
 
@@ -301,7 +389,10 @@ export class TypedColumnBuilder<T> extends ColumnBuilder {
 /**
  * Policy builder with table type locked in
  */
-export class TypedPolicyBuilder<DB, TableName extends TableNames<DB>> extends PolicyBuilder {
+export class TypedPolicyBuilder<
+  DB,
+  TableName extends TableNames<DB>,
+> extends PolicyBuilder {
   // All methods from PolicyBuilder are inherited and work the same
   // The table type is captured for use with typed column references
 }
@@ -322,10 +413,7 @@ export interface TypedRowguard<DB> {
    * @param table - Table name (autocompletes from schema)
    * @param column - Column name (autocompletes based on table)
    */
-  column<
-    T extends TableNames<DB>,
-    C extends ColumnNames<DB, T>
-  >(
+  column<T extends TableNames<DB>, C extends ColumnNames<DB, T>>(
     table: T,
     column: C
   ): TypedColumnBuilder<ColumnType<DB, T, C>>;
@@ -368,7 +456,10 @@ export function createRowguard<DB>(): TypedRowguard<DB> {
       table: T,
       column: C
     ) => {
-      return new TypedColumnBuilder<ColumnType<DB, T, C>>(table as string, column as string);
+      return new TypedColumnBuilder<ColumnType<DB, T, C>>(
+        table as string,
+        column as string
+      );
     },
 
     auth,

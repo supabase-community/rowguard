@@ -1,7 +1,18 @@
-import { useState } from 'react';
-import { Play, Copy, CheckCircle, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Play,
+  Copy,
+  CheckCircle,
+  AlertCircle,
+  Database,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import Editor, { Monaco } from '@monaco-editor/react';
 import * as RLS from 'rowguard';
+import { testConnection } from '../lib/supabase';
+import SchemaViewer from './SchemaViewer';
+import PolicyTester from './PolicyTester';
 
 // Import bundled type definitions from the library's dist folder
 import rlsDslBundledTypes from '../../../dist/bundle.d.ts?raw';
@@ -161,6 +172,13 @@ export default function RLSTester() {
   const [output, setOutput] = useState('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [showSchema, setShowSchema] = useState(true);
+
+  // Test Supabase connection on mount
+  useEffect(() => {
+    testConnection().then(setIsConnected);
+  }, []);
 
   // Configure Monaco with bundled type definitions
   const handleEditorWillMount = (monaco: Monaco) => {
@@ -262,18 +280,49 @@ export default function RLSTester() {
     setError('');
   };
 
+  const handleSchemaInsert = (text: string) => {
+    // Insert text at cursor position in editor
+    // For now, we'll append to the end
+    setInput((prev) => prev + text);
+  };
+
   return (
     <div className="min-h-screen bg-dark-bg">
       <div className="max-w-screen-2xl mx-auto p-6">
         <header className="mb-8">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-text-primary mb-2">
-                Rowguard - RLS Policy DSL Tester
-              </h1>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-4xl font-bold text-text-primary">
+                  Rowguard - RLS Policy DSL Tester
+                </h1>
+                {isConnected !== null && (
+                  <div
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+                      isConnected
+                        ? 'bg-green-950/50 text-green-400 border border-green-800'
+                        : 'bg-yellow-950/50 text-yellow-400 border border-yellow-800'
+                    }`}
+                  >
+                    <Database size={14} />
+                    {isConnected
+                      ? 'Connected to Local Supabase'
+                      : 'Disconnected - SQL Only'}
+                  </div>
+                )}
+              </div>
               <p className="text-text-secondary">
                 Test and generate PostgreSQL Row Level Security policies with
                 TypeScript
+                {isConnected === false && (
+                  <span className="ml-2 text-yellow-400">
+                    • Run{' '}
+                    <code className="px-1.5 py-0.5 bg-dark-surface rounded text-xs">
+                      supabase start
+                    </code>{' '}
+                    to enable live testing
+                  </span>
+                )}
               </p>
             </div>
             <a
@@ -304,96 +353,139 @@ export default function RLSTester() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border overflow-hidden flex flex-col">
-            <div className="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
-              <h2 className="font-semibold">TypeScript Input</h2>
-              <button
-                onClick={executeCode}
-                className="flex items-center gap-2 bg-supabase-lime hover:bg-supabase-lime-hover text-dark-bg px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-              >
-                <Play size={16} />
-                Generate
-              </button>
-            </div>
-            <Editor
-              height="600px"
-              defaultLanguage="typescript"
-              theme="vs-dark"
-              value={input}
-              onChange={(value) => setInput(value || '')}
-              beforeMount={handleEditorWillMount}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 14,
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                tabSize: 2,
-                wordWrap: 'on',
-                quickSuggestions: true,
-                suggestOnTriggerCharacters: true,
-              }}
-            />
-          </div>
-
-          <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border overflow-hidden flex flex-col">
-            <div className="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
-              <h2 className="font-semibold">Generated SQL</h2>
-              {output && (
-                <button
-                  onClick={copyToClipboard}
-                  className="flex items-center gap-2 bg-dark-surface-2 hover:bg-dark-border-strong px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                >
-                  {copied ? (
-                    <>
-                      <CheckCircle size={16} />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={16} />
-                      Copy
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-            {error ? (
-              <div className="flex-1 p-6 min-h-[600px]">
-                <div className="flex items-start gap-3 bg-red-950/50 border border-red-800 rounded-lg p-4">
-                  <AlertCircle
-                    className="text-red-400 flex-shrink-0"
-                    size={20}
-                  />
-                  <div>
-                    <h3 className="font-semibold text-red-300 mb-1">Error</h3>
-                    <p className="text-red-400 text-sm font-mono">{error}</p>
-                  </div>
-                </div>
-              </div>
-            ) : output ? (
-              <Editor
-                height="600px"
-                defaultLanguage="sql"
-                theme="vs-dark"
-                value={output}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  fontSize: 14,
-                  lineNumbers: 'on',
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                  wordWrap: 'on',
-                }}
+        <div className="flex gap-6">
+          {/* Schema Viewer Sidebar */}
+          {showSchema && isConnected && (
+            <div className="w-80 flex-shrink-0">
+              <SchemaViewer
+                onInsert={handleSchemaInsert}
+                isConnected={isConnected}
               />
-            ) : (
-              <div className="flex items-center justify-center min-h-[600px]">
-                <p className="text-text-tertiary text-sm">
-                  Click "Generate" to see the SQL output
-                </p>
+            </div>
+          )}
+
+          {/* Main Content */}
+          <div className="flex-1 min-w-0 space-y-6">
+            {/* Editors Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border overflow-hidden flex flex-col">
+                <div className="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {isConnected && (
+                      <button
+                        onClick={() => setShowSchema(!showSchema)}
+                        className="p-1 hover:bg-dark-surface-2 rounded transition-colors"
+                        title={showSchema ? 'Hide schema' : 'Show schema'}
+                      >
+                        {showSchema ? (
+                          <ChevronLeft size={16} />
+                        ) : (
+                          <ChevronRight size={16} />
+                        )}
+                      </button>
+                    )}
+                    <h2 className="font-semibold">TypeScript Input</h2>
+                  </div>
+                  <button
+                    onClick={executeCode}
+                    className="flex items-center gap-2 bg-supabase-lime hover:bg-supabase-lime-hover text-dark-bg px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                  >
+                    <Play size={16} />
+                    Generate
+                  </button>
+                </div>
+                <Editor
+                  height="600px"
+                  defaultLanguage="typescript"
+                  theme="vs-dark"
+                  value={input}
+                  onChange={(value) => setInput(value || '')}
+                  beforeMount={handleEditorWillMount}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    tabSize: 2,
+                    wordWrap: 'on',
+                    quickSuggestions: true,
+                    suggestOnTriggerCharacters: true,
+                  }}
+                />
               </div>
+
+              <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border overflow-hidden flex flex-col">
+                <div className="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
+                  <h2 className="font-semibold">Generated SQL</h2>
+                  {output && (
+                    <button
+                      onClick={copyToClipboard}
+                      className="flex items-center gap-2 bg-dark-surface-2 hover:bg-dark-border-strong px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                    >
+                      {copied ? (
+                        <>
+                          <CheckCircle size={16} />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={16} />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+                {error ? (
+                  <div className="flex-1 p-6 min-h-[600px]">
+                    <div className="flex items-start gap-3 bg-red-950/50 border border-red-800 rounded-lg p-4">
+                      <AlertCircle
+                        className="text-red-400 flex-shrink-0"
+                        size={20}
+                      />
+                      <div>
+                        <h3 className="font-semibold text-red-300 mb-1">
+                          Error
+                        </h3>
+                        <p className="text-red-400 text-sm font-mono">
+                          {error}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : output ? (
+                  <Editor
+                    height="600px"
+                    defaultLanguage="sql"
+                    theme="vs-dark"
+                    value={output}
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      fontSize: 14,
+                      lineNumbers: 'on',
+                      scrollBeyondLastLine: false,
+                      automaticLayout: true,
+                      wordWrap: 'on',
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center min-h-[600px]">
+                    <p className="text-text-tertiary text-sm">
+                      Click "Generate" to see the SQL output
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Policy Tester */}
+            {output && (
+              <PolicyTester
+                generatedSQL={output}
+                isConnected={isConnected ?? false}
+              />
             )}
           </div>
         </div>

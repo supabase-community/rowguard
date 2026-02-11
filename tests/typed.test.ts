@@ -53,7 +53,8 @@ describe('Typed Rowguard', () => {
   const rg = createRowguard<TestDatabase>();
 
   it('generates SQL with typed columns', () => {
-    const policy = rg.policy('user_posts')
+    const policy = rg
+      .policy('user_posts')
       .on('posts')
       .read()
       .when(rg.column('posts', 'user_id').eq(rg.auth.uid()));
@@ -65,17 +66,19 @@ describe('Typed Rowguard', () => {
   });
 
   it('supports string equality', () => {
-    const policy = rg.policy('email_check')
+    const policy = rg
+      .policy('email_check')
       .on('users')
       .read()
       .when(rg.column('users', 'email').eq('test@example.com'));
 
     const sql = policy.toSQL();
-    expect(sql).toContain('users.email = \'test@example.com\'');
+    expect(sql).toContain("users.email = 'test@example.com'");
   });
 
   it('supports numeric comparisons', () => {
-    const policy = rg.policy('age_check')
+    const policy = rg
+      .policy('age_check')
       .on('users')
       .read()
       .when(rg.column('users', 'age').gt(18));
@@ -85,7 +88,8 @@ describe('Typed Rowguard', () => {
   });
 
   it('supports boolean equality', () => {
-    const policy = rg.policy('published_posts')
+    const policy = rg
+      .policy('published_posts')
       .on('posts')
       .read()
       .when(rg.column('posts', 'published').eq(true));
@@ -95,11 +99,14 @@ describe('Typed Rowguard', () => {
   });
 
   it('supports chaining with and/or', () => {
-    const policy = rg.policy('complex')
+    const policy = rg
+      .policy('complex')
       .on('posts')
       .read()
       .when(
-        rg.column('posts', 'user_id').eq(rg.auth.uid())
+        rg
+          .column('posts', 'user_id')
+          .eq(rg.auth.uid())
           .or(rg.column('posts', 'published').eq(true))
       );
 
@@ -110,7 +117,8 @@ describe('Typed Rowguard', () => {
   });
 
   it('supports null checks', () => {
-    const policy = rg.policy('not_deleted')
+    const policy = rg
+      .policy('not_deleted')
       .on('posts')
       .read()
       .when(rg.column('posts', 'user_id').isNotNull());
@@ -120,7 +128,8 @@ describe('Typed Rowguard', () => {
   });
 
   it('supports isOwner helper', () => {
-    const policy = rg.policy('owner_check')
+    const policy = rg
+      .policy('owner_check')
       .on('posts')
       .read()
       .when(rg.column('posts', 'user_id').isOwner());
@@ -130,7 +139,8 @@ describe('Typed Rowguard', () => {
   });
 
   it('supports isPublic helper', () => {
-    const policy = rg.policy('public_check')
+    const policy = rg
+      .policy('public_check')
       .on('posts')
       .read()
       .when(rg.column('posts', 'published').isPublic());
@@ -140,44 +150,47 @@ describe('Typed Rowguard', () => {
   });
 
   it('supports IN operator with array', () => {
-    const policy = rg.policy('status_check')
+    const policy = rg
+      .policy('status_check')
       .on('posts')
       .read()
       .when(rg.column('posts', 'title').in(['Draft', 'Published']));
 
     const sql = policy.toSQL();
     expect(sql).toContain('posts.title IN');
-    expect(sql).toContain('\'Draft\'');
-    expect(sql).toContain('\'Published\'');
+    expect(sql).toContain("'Draft'");
+    expect(sql).toContain("'Published'");
   });
 
   it('supports LIKE pattern matching', () => {
-    const policy = rg.policy('pattern_check')
+    const policy = rg
+      .policy('pattern_check')
       .on('users')
       .read()
       .when(rg.column('users', 'email').like('%@example.com'));
 
     const sql = policy.toSQL();
-    expect(sql).toContain('users.email LIKE \'%@example.com\'');
+    expect(sql).toContain("users.email LIKE '%@example.com'");
   });
 
   it('supports ILIKE pattern matching', () => {
-    const policy = rg.policy('case_insensitive')
+    const policy = rg
+      .policy('case_insensitive')
       .on('users')
       .read()
       .when(rg.column('users', 'email').ilike('%@EXAMPLE.COM'));
 
     const sql = policy.toSQL();
-    expect(sql).toContain('users.email ILIKE \'%@EXAMPLE.COM\'');
+    expect(sql).toContain("users.email ILIKE '%@EXAMPLE.COM'");
   });
 
   it('supports multiple comparison operators', () => {
-    const policy = rg.policy('age_range')
+    const policy = rg
+      .policy('age_range')
       .on('users')
       .read()
       .when(
-        rg.column('users', 'age').gte(18)
-          .and(rg.column('users', 'age').lte(65))
+        rg.column('users', 'age').gte(18).and(rg.column('users', 'age').lte(65))
       );
 
     const sql = policy.toSQL();
@@ -187,7 +200,8 @@ describe('Typed Rowguard', () => {
   });
 
   it('supports session variables with belongsToTenant', () => {
-    const policy = rg.policy('tenant_isolation')
+    const policy = rg
+      .policy('tenant_isolation')
       .on('posts')
       .all()
       .requireAll()
@@ -196,11 +210,14 @@ describe('Typed Rowguard', () => {
     const sql = policy.toSQL();
     expect(sql).toContain('RESTRICTIVE');
     expect(sql).toContain('posts.user_id');
-    expect(sql).toContain('current_setting(\'app.current_tenant_id\', true)::INTEGER');
+    expect(sql).toContain(
+      "current_setting('app.current_tenant_id', true)::INTEGER"
+    );
   });
 
   it('generates policy with both USING and WITH CHECK', () => {
-    const policy = rg.policy('update_own')
+    const policy = rg
+      .policy('update_own')
       .on('posts')
       .update()
       .when(rg.column('posts', 'user_id').isOwner())
@@ -213,7 +230,8 @@ describe('Typed Rowguard', () => {
   });
 
   it('uses allow() method to set appropriate clauses', () => {
-    const readPolicy = rg.policy('read_posts')
+    const readPolicy = rg
+      .policy('read_posts')
       .on('posts')
       .read()
       .allow(rg.column('posts', 'published').eq(true));
@@ -222,7 +240,8 @@ describe('Typed Rowguard', () => {
     expect(readSQL).toContain('USING');
     expect(readSQL).not.toContain('WITH CHECK');
 
-    const insertPolicy = rg.policy('insert_posts')
+    const insertPolicy = rg
+      .policy('insert_posts')
       .on('posts')
       .write()
       .allow(rg.column('posts', 'user_id').isOwner());
@@ -231,7 +250,8 @@ describe('Typed Rowguard', () => {
     expect(insertSQL).toContain('WITH CHECK');
     expect(insertSQL).not.toContain('USING');
 
-    const updatePolicy = rg.policy('update_posts')
+    const updatePolicy = rg
+      .policy('update_posts')
       .on('posts')
       .update()
       .allow(rg.column('posts', 'user_id').isOwner());

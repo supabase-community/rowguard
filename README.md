@@ -15,14 +15,29 @@ A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies with 
 
 Try the live demo at https://rowguard-demo.vercel.app/
 
-To run the demo locally:
+### 🆕 Live Policy Testing
+
+The demo now includes **live database testing** - connect to a local Supabase instance to:
+
+- 📊 Browse your database schema
+- 🧪 Apply policies to a real database
+- 👥 Test as different users
+- ✅ Verify RLS enforcement in real-time
+
+Run the full demo locally with database:
 
 ```bash
 pnpm install
+pnpm demo:dev:full  # Starts Supabase + demo
+```
+
+Or run in SQL-only mode (no database):
+
+```bash
 pnpm demo:dev
 ```
 
-The demo source code is in the [`demo/`](./demo) directory.
+The demo source code is in the [`demo/`](./demo) directory. See [demo/README.md](./demo/README.md) for detailed setup instructions.
 
 ## Features
 
@@ -87,11 +102,12 @@ import { Database } from './database.types';
 const rg = createRowguard<Database>();
 
 // ✅ Autocomplete for tables and columns
-const userDocsPolicy = rg.policy('user_documents')
-  .on('documents')  // ← IDE shows all table names
+const userDocsPolicy = rg
+  .policy('user_documents')
+  .on('documents') // ← IDE shows all table names
   .read()
   .when(rg.column('documents', 'user_id').eq(rg.auth.uid()));
-  //             ↑ autocomplete    ↑ autocomplete columns
+//             ↑ autocomplete    ↑ autocomplete columns
 
 // ❌ Type errors caught at compile time
 // rg.column('documents', 'nonexistent_column')  // TypeScript error
@@ -101,6 +117,7 @@ console.log(userDocsPolicy.toSQL());
 ```
 
 **Benefits:**
+
 - ✅ Autocomplete for tables and columns
 - ✅ Catch typos at compile time
 - ✅ Type-safe value comparisons
