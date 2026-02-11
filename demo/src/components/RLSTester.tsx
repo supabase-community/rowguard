@@ -314,16 +314,38 @@ export default function RLSTester() {
               <p className="text-text-secondary">
                 Test and generate PostgreSQL Row Level Security policies with
                 TypeScript
-                {isConnected === false && (
-                  <span className="ml-2 text-yellow-400">
-                    • Run{' '}
-                    <code className="px-1.5 py-0.5 bg-dark-surface rounded text-xs">
-                      supabase start
-                    </code>{' '}
-                    to enable live testing
-                  </span>
-                )}
               </p>
+              {isConnected === false && (
+                <div className="mt-3 p-3 bg-blue-950/30 border border-blue-800/50 rounded-lg">
+                  <p className="text-sm text-blue-300">
+                    💡 <strong>Database features are local-only</strong> - To
+                    test policies with live RLS enforcement:
+                  </p>
+                  <ol className="text-xs text-blue-200 mt-2 ml-4 space-y-1 list-decimal">
+                    <li>
+                      Clone the repo:{' '}
+                      <code className="px-1 py-0.5 bg-blue-900/50 rounded">
+                        git clone
+                        https://github.com/supabase-community/rowguard.git
+                      </code>
+                    </li>
+                    <li>
+                      Run locally:{' '}
+                      <code className="px-1 py-0.5 bg-blue-900/50 rounded">
+                        pnpm demo:dev:full
+                      </code>
+                    </li>
+                    <li>
+                      Get full migration workflow, schema viewer, and policy
+                      testing!
+                    </li>
+                  </ol>
+                  <p className="text-xs text-blue-300 mt-2">
+                    This deployed version generates SQL only (no database
+                    connection possible).
+                  </p>
+                </div>
+              )}
             </div>
             <a
               href="https://supabase-community.github.io/rowguard/"

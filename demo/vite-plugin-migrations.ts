@@ -1,10 +1,19 @@
 /**
  * Vite Plugin for Migration File Operations
  *
- * Provides API endpoints for the demo to manage migration files:
+ * ⚠️ SECURITY WARNING: DEVELOPMENT ONLY ⚠️
+ * This plugin provides filesystem write/delete access and should ONLY be used
+ * in local development. It is automatically disabled in production builds.
+ *
+ * Features:
  * - POST /api/migrations - Create a new migration file
  * - GET /api/migrations - List existing policy migration files
  * - DELETE /api/migrations - Remove a migration file
+ *
+ * Safety measures:
+ * - Only runs in Vite dev server (not in production builds)
+ * - Validates filenames to prevent directory traversal
+ * - Only accessible on localhost by default
  */
 
 import fs from 'fs/promises';
@@ -28,8 +37,22 @@ export function migrationsPlugin(): Plugin {
     configResolved(config) {
       // migrations dir is in the root project, not in demo/
       migrationsDir = path.join(config.root, '..', 'supabase', 'migrations');
+
+      // Log warning if not in development mode
+      if (config.command !== 'serve') {
+        console.warn(
+          '[migrations-api] Plugin is designed for development only and will not run in production builds.'
+        );
+      }
     },
     configureServer(server: ViteDevServer) {
+      // Double-check we're in development mode
+      if (process.env.NODE_ENV === 'production') {
+        console.error(
+          '[migrations-api] SECURITY WARNING: This plugin should not run in production!'
+        );
+        return;
+      }
       server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith('/api/migrations')) {
           return next();
@@ -54,10 +77,16 @@ export function migrationsPlugin(): Plugin {
             req.on('data', (chunk) => (body += chunk));
             req.on('end', async () => {
               try {
-                const { filename, content } = JSON.parse(body) as MigrationRequest;
+                const { filename, content } = JSON.parse(
+                  body
+                ) as MigrationRequest;
 
                 // Validate filename (prevent directory traversal)
-                if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+                if (
+                  filename.includes('..') ||
+                  filename.includes('/') ||
+                  filename.includes('\\')
+                ) {
                   res.writeHead(400);
                   res.end(JSON.stringify({ error: 'Invalid filename' }));
                   return;
@@ -73,7 +102,10 @@ export function migrationsPlugin(): Plugin {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(
                   JSON.stringify({
-                    error: error instanceof Error ? error.message : 'Failed to create migration',
+                    error:
+                      error instanceof Error
+                        ? error.message
+                        : 'Failed to create migration',
                   })
                 );
               }
@@ -93,7 +125,10 @@ export function migrationsPlugin(): Plugin {
               res.writeHead(500, { 'Content-Type': 'application/json' });
               res.end(
                 JSON.stringify({
-                  error: error instanceof Error ? error.message : 'Failed to list migrations',
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : 'Failed to list migrations',
                 })
               );
             }
@@ -106,7 +141,11 @@ export function migrationsPlugin(): Plugin {
                 const { filename } = JSON.parse(body) as DeleteRequest;
 
                 // Validate filename (prevent directory traversal)
-                if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+                if (
+                  filename.includes('..') ||
+                  filename.includes('/') ||
+                  filename.includes('\\')
+                ) {
                   res.writeHead(400);
                   res.end(JSON.stringify({ error: 'Invalid filename' }));
                   return;
@@ -122,7 +161,10 @@ export function migrationsPlugin(): Plugin {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(
                   JSON.stringify({
-                    error: error instanceof Error ? error.message : 'Failed to delete migration',
+                    error:
+                      error instanceof Error
+                        ? error.message
+                        : 'Failed to delete migration',
                   })
                 );
               }

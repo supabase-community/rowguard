@@ -207,13 +207,20 @@ export default function SchemaViewer({
           <h2 className="font-semibold text-text-primary">Database Schema</h2>
         </div>
         <div className="text-sm text-text-tertiary text-center py-8">
-          <ShieldOff size={48} className="mx-auto mb-3 opacity-50" />
-          <p>Connect to Supabase to view schema</p>
-          <p className="mt-2 text-xs">
-            Run{' '}
-            <code className="px-1.5 py-0.5 bg-dark-surface-2 rounded">
-              supabase start
-            </code>
+          <ShieldOff
+            size={48}
+            className="mx-auto mb-3 opacity-50 text-yellow-400"
+          />
+          <p className="font-semibold text-text-primary mb-1">
+            No Database Connection
+          </p>
+          <p className="text-xs mb-3">Schema viewer requires local Supabase</p>
+          <p className="text-xs text-blue-300">
+            💡 Run locally with{' '}
+            <code className="px-1.5 py-0.5 bg-blue-900/50 rounded">
+              pnpm demo:dev:full
+            </code>{' '}
+            to view schema
           </p>
         </div>
       </div>

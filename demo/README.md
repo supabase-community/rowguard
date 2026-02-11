@@ -20,6 +20,10 @@ This demo is located in the `/demo` directory of the main [rowguard repository](
 - 💡 Error display with helpful messages
 - 🔍 Function reference panel
 
+### ⚠️ Security Note
+
+The **migration file features** (save/delete) are **development-only** and work exclusively with `pnpm demo:dev` on localhost. The public demo at https://rowguard-demo.vercel.app is a static build with no backend - it only generates SQL and does not have filesystem access. See [SECURITY.md](../SECURITY.md) for details.
+
 ### 🆕 Live Testing Features (Migration-Based Workflow)
 
 - 🗄️ **Database Schema Viewer** - Browse tables and columns from your local Supabase instance
@@ -169,6 +173,7 @@ The Policy Tester teaches you the real Supabase development workflow using migra
 2. **Run `pnpm supabase:reset`** again to revert the changes
 
 **Why Migration Files?**
+
 - ✅ Teaches the real Supabase workflow (how you'd deploy policies in production)
 - ✅ No security bypasses or privileged database functions needed
 - ✅ Migration files are version-controllable
@@ -317,6 +322,7 @@ port = 54323  # And this
 **Cause**: File system permissions or Vite dev server not running properly
 
 **Fix**:
+
 ```bash
 # Restart the dev server
 pnpm demo:dev
@@ -326,6 +332,7 @@ ls supabase/migrations/
 ```
 
 **Alternative**: If the automated migration save doesn't work, you can create migrations manually:
+
 ```bash
 # Create a new migration file
 supabase migration new policy_name
@@ -397,6 +404,8 @@ For local development, the default values work out of the box.
 
 ## Architecture
 
+### Local Development
+
 ```
 ┌─────────────────────────────────────────┐
 │ Local Supabase (Docker)                 │
@@ -407,11 +416,26 @@ For local development, the default values work out of the box.
                │
          ┌─────┴─────┐
          │           │
-    ┌────▼────┐  ┌──▼──────┐
-    │  Demo   │  │  Future │
-    │   UI    │  │  Tests  │
-    └─────────┘  └─────────┘
+    ┌────▼────┐  ┌──▼──────────────────┐
+    │  Demo   │  │  Vite Dev Server    │
+    │   UI    │  │  (localhost:5173)   │
+    │         │  │  + Migration API    │
+    └─────────┘  └─────────────────────┘
 ```
+
+### Production Deployment (Vercel/Netlify)
+
+```
+┌─────────────────────────────────────────┐
+│ Static Files Only                       │
+│ - HTML, CSS, JS                         │
+│ - No backend server                     │
+│ - No migration API                      │
+│ - SQL generation only                   │
+└─────────────────────────────────────────┘
+```
+
+**Important**: Migration file features only work in local development. Production deployments are static and safe.
 
 ## Future Enhancements
 

@@ -29,7 +29,11 @@ export { sql, SQLExpression } from './sql';
 // ============================================
 // NEW: Typed API exports
 // ============================================
-export { createRowguard, TypedColumnBuilder, TypedPolicyBuilder } from './typed';
+export {
+  createRowguard,
+  TypedColumnBuilder,
+  TypedPolicyBuilder,
+} from './typed';
 export type {
   TypedRowguard,
   TableNames,

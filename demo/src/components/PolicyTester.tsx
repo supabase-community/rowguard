@@ -49,13 +49,17 @@ export default function PolicyTester({
   isConnected,
 }: PolicyTesterProps) {
   const [testQuery, setTestQuery] = useState('SELECT * FROM documents');
-  const [selectedUser, setSelectedUser] = useState<TestUserId>(TEST_USERS[0].id);
+  const [selectedUser, setSelectedUser] = useState<TestUserId>(
+    TEST_USERS[0].id
+  );
   const [currentUser, setCurrentUser] = useState<TestUserId | null>(null);
   const [results, setResults] = useState<TestResult[]>([]);
   const [testing, setTesting] = useState(false);
   const [migrations, setMigrations] = useState<string[]>([]);
   const [loadingMigrations, setLoadingMigrations] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [saveStatus, setSaveStatus] = useState<
+    'idle' | 'saving' | 'success' | 'error'
+  >('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [copiedCommand, setCopiedCommand] = useState(false);
 
@@ -94,7 +98,9 @@ export default function PolicyTester({
       setSaveError(null);
 
       // Extract policy name from SQL (e.g., "CREATE POLICY user_documents ON...")
-      const policyNameMatch = generatedSQL.match(/CREATE POLICY\s+"?([^"\s]+)"?/i);
+      const policyNameMatch = generatedSQL.match(
+        /CREATE POLICY\s+"?([^"\s]+)"?/i
+      );
       const extractedName = policyNameMatch ? policyNameMatch[1] : policyName;
 
       // Generate timestamped filename
@@ -102,7 +108,9 @@ export default function PolicyTester({
         .toISOString()
         .replace(/[-:T]/g, '')
         .replace(/\.\d{3}Z$/, '');
-      const sanitizedName = extractedName.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const sanitizedName = extractedName
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '_');
       const filename = `${timestamp}_policy_${sanitizedName}.sql`;
 
       // Call Vite plugin API to create migration file
@@ -123,7 +131,9 @@ export default function PolicyTester({
     } catch (error) {
       console.error('Error saving migration:', error);
       setSaveStatus('error');
-      setSaveError(error instanceof Error ? error.message : 'Failed to save migration');
+      setSaveError(
+        error instanceof Error ? error.message : 'Failed to save migration'
+      );
     }
   };
 
@@ -143,7 +153,9 @@ export default function PolicyTester({
       await loadMigrations(); // Reload migration list
     } catch (error) {
       console.error('Error removing migration:', error);
-      alert(error instanceof Error ? error.message : 'Failed to remove migration');
+      alert(
+        error instanceof Error ? error.message : 'Failed to remove migration'
+      );
     }
   };
 
@@ -190,7 +202,9 @@ export default function PolicyTester({
       // Example: "SELECT * FROM documents" or "SELECT id, title FROM posts"
       const match = testQuery.match(/SELECT\s+(.+?)\s+FROM\s+(\w+)/i);
       if (!match) {
-        throw new Error('Only simple SELECT queries are supported (SELECT ... FROM table)');
+        throw new Error(
+          'Only simple SELECT queries are supported (SELECT ... FROM table)'
+        );
       }
 
       const [, columns, table] = match;
@@ -257,13 +271,64 @@ export default function PolicyTester({
           <Play size={20} />
           Policy Tester
         </h2>
-        <div className="text-sm text-text-tertiary text-center py-8">
-          <AlertCircle size={48} className="mx-auto mb-3 opacity-50" />
-          <p>Connect to Supabase to test policies</p>
-          <p className="mt-2 text-xs">
-            Run{' '}
-            <code className="px-1.5 py-0.5 bg-dark-surface-2 rounded">supabase start</code>
-          </p>
+        <div className="text-sm text-text-tertiary py-8">
+          <AlertCircle
+            size={48}
+            className="mx-auto mb-4 opacity-50 text-yellow-400"
+          />
+          <div className="text-center mb-4">
+            <p className="font-semibold text-text-primary">
+              Database Connection Required
+            </p>
+            <p className="text-xs mt-1">
+              Policy testing features require a local Supabase instance
+            </p>
+          </div>
+
+          <div className="bg-blue-950/30 border border-blue-800/50 rounded-lg p-4 text-left">
+            <p className="text-sm text-blue-300 font-semibold mb-2">
+              💡 This deployed version is SQL-generation only
+            </p>
+            <p className="text-xs text-blue-200 mb-3">
+              The migration workflow, schema viewer, and policy testing features
+              only work when running locally with Supabase.
+            </p>
+            <div className="text-xs text-blue-200 space-y-2">
+              <p className="font-semibold">To enable full features:</p>
+              <ol className="list-decimal ml-4 space-y-1">
+                <li>
+                  Clone:{' '}
+                  <code className="px-1 py-0.5 bg-blue-900/50 rounded font-mono">
+                    git clone https://github.com/supabase-community/rowguard.git
+                  </code>
+                </li>
+                <li>
+                  Install:{' '}
+                  <code className="px-1 py-0.5 bg-blue-900/50 rounded font-mono">
+                    pnpm install
+                  </code>
+                </li>
+                <li>
+                  Run:{' '}
+                  <code className="px-1 py-0.5 bg-blue-900/50 rounded font-mono">
+                    pnpm demo:dev:full
+                  </code>
+                </li>
+              </ol>
+              <p className="mt-3 pt-3 border-t border-blue-800/50">
+                See{' '}
+                <a
+                  href="https://github.com/supabase-community/rowguard/tree/main/demo"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-supabase-lime hover:underline"
+                >
+                  demo/README.md
+                </a>{' '}
+                for detailed setup instructions.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -319,7 +384,10 @@ export default function PolicyTester({
 
           {saveError && (
             <div className="flex items-start gap-2 p-3 bg-red-950/50 border border-red-800 rounded-lg text-sm">
-              <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <AlertCircle
+                size={16}
+                className="text-red-400 flex-shrink-0 mt-0.5"
+              />
               <div className="text-red-400">
                 <p className="font-semibold">Error</p>
                 <p className="text-xs font-mono mt-1">{saveError}</p>
@@ -339,7 +407,10 @@ export default function PolicyTester({
                   disabled={loadingMigrations}
                   className="text-xs text-supabase-lime hover:text-supabase-lime-hover"
                 >
-                  <RefreshCw size={12} className={loadingMigrations ? 'animate-spin' : ''} />
+                  <RefreshCw
+                    size={12}
+                    className={loadingMigrations ? 'animate-spin' : ''}
+                  />
                 </button>
               </div>
               <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -395,7 +466,8 @@ export default function PolicyTester({
               </button>
             </div>
             <p className="text-xs text-text-tertiary">
-              💡 This resets the database and applies all migrations, including your new policy.
+              💡 This resets the database and applies all migrations, including
+              your new policy.
             </p>
           </div>
         </div>
@@ -406,12 +478,16 @@ export default function PolicyTester({
             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 text-green-400 text-sm font-bold">
               3
             </span>
-            <label className="text-sm font-medium text-text-primary">Test Policy with RLS</label>
+            <label className="text-sm font-medium text-text-primary">
+              Test Policy with RLS
+            </label>
           </div>
 
           {/* User Selector */}
           <div>
-            <label className="text-xs text-text-secondary mb-1.5 block">Select Test User</label>
+            <label className="text-xs text-text-secondary mb-1.5 block">
+              Select Test User
+            </label>
             <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value as TestUserId)}
@@ -427,7 +503,9 @@ export default function PolicyTester({
 
           {/* Test Query */}
           <div>
-            <label className="text-xs text-text-secondary mb-1.5 block">Test Query</label>
+            <label className="text-xs text-text-secondary mb-1.5 block">
+              Test Query
+            </label>
             <textarea
               value={testQuery}
               onChange={(e) => setTestQuery(e.target.value)}
@@ -459,7 +537,9 @@ export default function PolicyTester({
         {/* Results */}
         {results.length > 0 && (
           <div className="space-y-3">
-            <label className="text-sm font-medium text-text-primary">Query Results</label>
+            <label className="text-sm font-medium text-text-primary">
+              Query Results
+            </label>
             <div className="space-y-3">
               {results.map((result) => (
                 <div
@@ -468,7 +548,9 @@ export default function PolicyTester({
                 >
                   <div className="flex items-center gap-2 mb-3">
                     <User size={16} className="text-supabase-lime" />
-                    <span className="font-medium text-text-primary">{result.userName}</span>
+                    <span className="font-medium text-text-primary">
+                      {result.userName}
+                    </span>
                     <span className="text-xs text-text-tertiary ml-auto">
                       {result.error ? (
                         <span className="text-red-400 flex items-center gap-1">
@@ -478,7 +560,8 @@ export default function PolicyTester({
                       ) : (
                         <span className="text-green-400 flex items-center gap-1">
                           <CheckCircle2 size={12} />
-                          {result.rowCount} {result.rowCount === 1 ? 'row' : 'rows'}
+                          {result.rowCount}{' '}
+                          {result.rowCount === 1 ? 'row' : 'rows'}
                         </span>
                       )}
                     </span>
@@ -508,10 +591,14 @@ export default function PolicyTester({
         {/* Help Text */}
         <div className="pt-4 border-t border-dark-border">
           <p className="text-xs text-text-tertiary leading-relaxed">
-            💡 <strong>How it works:</strong> Save your policy as a migration file, apply it with{' '}
-            <code className="px-1 py-0.5 bg-dark-surface-2 rounded">pnpm supabase:reset</code>,
-            then test queries as different users. RLS is automatically enforced by the Supabase
-            client! Remove migrations and reset again to clean up.
+            💡 <strong>How it works:</strong> Save your policy as a migration
+            file, apply it with{' '}
+            <code className="px-1 py-0.5 bg-dark-surface-2 rounded">
+              pnpm supabase:reset
+            </code>
+            , then test queries as different users. RLS is automatically
+            enforced by the Supabase client! Remove migrations and reset again
+            to clean up.
           </p>
         </div>
       </div>
