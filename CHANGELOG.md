@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/supabase-community/rowguard/compare/rowguard-v0.1.1...rowguard-v0.2.0) (2026-02-11)
+
+
+### Features
+
+* add schema-aware types for compile-time validation ([#13](https://github.com/supabase-community/rowguard/issues/13)) ([9ab6623](https://github.com/supabase-community/rowguard/commit/9ab6623793e641fc20739c87220e4d72ac741e77))
+
 ## [0.1.1](https://github.com/supabase-community/rowguard/compare/rowguard-v0.1.0...rowguard-v0.1.1) (2026-02-11)
 
 ### Bug Fixes
