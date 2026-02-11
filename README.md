@@ -26,6 +26,7 @@ The demo source code is in the [`demo/`](./demo) directory.
 
 ## Features
 
+- **Type-safe schema integration** - Autocomplete and compile-time validation with Supabase-generated types
 - Simple & intuitive fluent API that reads like natural language
 - Natural left-to-right method chaining (no polish notation)
 - Zero dependencies - pure TypeScript, works everywhere
@@ -63,6 +64,52 @@ npm install https://pkg.pr.new/supabase-community/rowguard@{pr-number}
 
 ## Quick Start
 
+### Option 1: Type-Safe Policies (Recommended) 💡
+
+Get autocomplete and compile-time validation by generating types from your database schema.
+
+#### Step 1: Generate Database Types
+
+```bash
+# For remote project
+npx supabase gen types typescript --project-id "$PROJECT_REF" > database.types.ts
+
+# For local development
+npx supabase gen types typescript --local > database.types.ts
+```
+
+#### Step 2: Use Typed API
+
+```typescript
+import { createRowguard } from 'rowguard';
+import { Database } from './database.types';
+
+const rg = createRowguard<Database>();
+
+// ✅ Autocomplete for tables and columns
+const userDocsPolicy = rg.policy('user_documents')
+  .on('documents')  // ← IDE shows all table names
+  .read()
+  .when(rg.column('documents', 'user_id').eq(rg.auth.uid()));
+  //             ↑ autocomplete    ↑ autocomplete columns
+
+// ❌ Type errors caught at compile time
+// rg.column('documents', 'nonexistent_column')  // TypeScript error
+// rg.column('documents', 'user_id').eq(42)      // Type error: string !== number
+
+console.log(userDocsPolicy.toSQL());
+```
+
+**Benefits:**
+- ✅ Autocomplete for tables and columns
+- ✅ Catch typos at compile time
+- ✅ Type-safe value comparisons
+- ✅ Safe refactoring
+
+### Option 2: Without Type Generation
+
+If you don't have a Supabase project or prefer not to generate types:
+
 ```typescript
 import { policy, column, auth, from, session } from 'rowguard';
 
@@ -98,7 +145,9 @@ const memberPolicy = policy('member_access')
 console.log(userDocsPolicy.toSQL());
 ```
 
-### Policy Templates
+⚠️ **Note**: Without generated types, you won't get autocomplete or compile-time validation.
+
+### Policy Templates (Works with both APIs)
 
 ```typescript
 import { policies } from 'rowguard';

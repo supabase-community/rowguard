@@ -10,8 +10,8 @@ export default defineConfig({
     hookTimeout: 5000,
     exclude: ['**/node_modules/**', '**/dist/**'],
     include: isIntegration
-      ? ['tests/integration.test.ts']
-      : ['tests/sql-generation.test.ts'],
+      ? ["tests/integration.test.ts"]
+      : ["tests/sql-generation.test.ts", "tests/typed.test.ts"],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],
