@@ -7,6 +7,7 @@
 A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies with a clean, type-safe API.
 
 > **⚠️ Experimental:** This is an experimental project and not an official Supabase library. It is not published to npm. Test builds are available via [pkg-pr-new](https://pkg.pr.new) for evaluation purposes only.
+> **⚠️ No Performance Evaluation:** This library does not evaluate the policy performance. You should use Performance Advisory to evaluate the policy performance.
 
 ## Interactive Demo
 
