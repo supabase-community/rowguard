@@ -20,12 +20,13 @@ This demo is located in the `/demo` directory of the main [rowguard repository](
 - 💡 Error display with helpful messages
 - 🔍 Function reference panel
 
-### 🆕 Live Testing Features
+### 🆕 Live Testing Features (Migration-Based Workflow)
 
 - 🗄️ **Database Schema Viewer** - Browse tables and columns from your local Supabase instance
-- 🧪 **Policy Tester** - Apply policies to a live database and test them with real queries
-- 👥 **Multi-User Testing** - Switch between test users to verify RLS enforcement
-- ⚡ **Real-Time Validation** - See exactly what data each user can access
+- 📁 **Migration File Workflow** - Learn real Supabase development practices by generating migration files
+- 🧪 **Policy Tester** - Test policies with actual RLS enforcement using standard Supabase client
+- 👥 **Multi-User Testing** - Sign in as different test users to verify RLS behavior
+- ⚡ **Real-Time Validation** - See exactly what data each user can access with RLS active
 - 🔄 **Connection Status** - Clear indication of database connectivity
 
 ### Built-in Examples
@@ -139,15 +140,40 @@ When connected to Supabase, a sidebar shows all database tables:
 - **Expand/collapse** tables to view columns and types
 - **RLS indicator** shows which tables have Row Level Security enabled
 
-### 2. Policy Tester
+### 2. Policy Tester (Migration-Based Workflow)
 
-After generating SQL, use the Policy Tester to:
+The Policy Tester teaches you the real Supabase development workflow using migration files. After generating SQL:
 
-1. **Apply Policy** - Execute your generated policy on the database
-2. **Select Test User** - Choose from Alice, Bob, Charlie, or Diana
-3. **Run Test Query** - Execute a SELECT query to see what data is accessible
-4. **View Results** - See which rows are returned for each user
-5. **Remove Policy** - Clean up the test policy when done
+#### Step 1: Save as Migration File
+
+1. **Click "Save as Migration"** - Creates a timestamped migration file in `/supabase/migrations/`
+2. The file is saved as `YYYYMMDDHHMMSS_policy_<policy_name>.sql`
+3. Active migrations are listed in the Policy Tester panel
+
+#### Step 2: Apply Migration
+
+1. **Run in terminal**: `pnpm supabase:reset`
+2. This resets the database and applies all migrations (including your new policy)
+3. The policy is now active in your local database!
+
+#### Step 3: Test with User Context
+
+1. **Select Test User** - Choose from Alice, Bob, Charlie, or Diana
+2. **Enter Test Query** - Write a SELECT query (e.g., `SELECT * FROM documents`)
+3. **Click "Run Test Query"** - Signs in as the selected user and executes the query
+4. **View Results** - See which rows are accessible to that user (RLS is automatically enforced!)
+
+#### Step 4: Clean Up
+
+1. **Click the trash icon** next to a migration file to remove it
+2. **Run `pnpm supabase:reset`** again to revert the changes
+
+**Why Migration Files?**
+- ✅ Teaches the real Supabase workflow (how you'd deploy policies in production)
+- ✅ No security bypasses or privileged database functions needed
+- ✅ Migration files are version-controllable
+- ✅ Standard Supabase client automatically enforces RLS
+- ✅ Matches how you'll actually work with Supabase projects
 
 #### Test Users
 
@@ -175,15 +201,27 @@ SELECT * FROM projects WHERE id IN (
 );
 ```
 
-### 3. Example Workflow
+### 3. Complete Example Workflow
 
-1. Load an example (e.g., "User Ownership")
-2. Click "Generate" to create SQL
-3. Click "Apply Policy" in the Policy Tester
-4. Select different users from the dropdown
-5. Run a test query (e.g., `SELECT * FROM documents`)
-6. Observe how different users see different rows
-7. Click "Remove Policy" to clean up
+**Testing a User Ownership Policy:**
+
+1. **Load Example**: Click "User Ownership" from the examples
+2. **Generate SQL**: Click "Generate" to see the CREATE POLICY statement
+3. **Save Migration**: Click "Save as Migration" in the Policy Tester
+4. **Apply in Terminal**: Run `pnpm supabase:reset`
+5. **Test as Alice**:
+   - Select "Alice (alice@example.com)" from dropdown
+   - Enter query: `SELECT * FROM documents`
+   - Click "Run Test Query"
+   - Result: Alice sees only her 2 documents ✅
+6. **Test as Bob**:
+   - Select "Bob (bob@example.com)" from dropdown
+   - Click "Run Test Query" again
+   - Result: Bob sees only his 2 different documents ✅
+7. **Verify RLS Works**: Different users see different data - policy is working!
+8. **Clean Up**:
+   - Click trash icon to remove migration file
+   - Run `pnpm supabase:reset` to revert changes
 
 ## Database Schema
 
@@ -274,15 +312,28 @@ port = 54322  # And this
 port = 54323  # And this
 ```
 
-### Policy Application Fails
+### Migration File Creation Fails
 
-**Cause**: Demo uses simplified RPC approach - full implementation requires database functions
+**Cause**: File system permissions or Vite dev server not running properly
 
-**Solution**: The demo shows the workflow but has limitations:
+**Fix**:
+```bash
+# Restart the dev server
+pnpm demo:dev
 
-- Manual policy application via Studio SQL editor works fully
-- Automated testing requires custom database functions (see plan for details)
-- For now, copy generated SQL and paste into Studio
+# Ensure supabase/migrations/ directory exists
+ls supabase/migrations/
+```
+
+**Alternative**: If the automated migration save doesn't work, you can create migrations manually:
+```bash
+# Create a new migration file
+supabase migration new policy_name
+
+# Paste your generated SQL into the file
+# Then apply with:
+pnpm supabase:reset
+```
 
 ### Type Generation Errors
 

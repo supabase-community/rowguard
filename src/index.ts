@@ -29,11 +29,9 @@ export { sql, SQLExpression } from './sql';
 // ============================================
 // NEW: Typed API exports
 // ============================================
-export {
-  createRowguard,
+export { createRowguard, TypedColumnBuilder, TypedPolicyBuilder } from './typed';
+export type {
   TypedRowguard,
-  TypedColumnBuilder,
-  TypedPolicyBuilder,
   TableNames,
   ColumnNames,
   ColumnType,

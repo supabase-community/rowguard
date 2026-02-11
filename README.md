@@ -15,14 +15,17 @@ A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies with 
 
 Try the live demo at https://rowguard-demo.vercel.app/
 
-### 🆕 Live Policy Testing
+### 🆕 Live Policy Testing (Migration-Based Workflow)
 
-The demo now includes **live database testing** - connect to a local Supabase instance to:
+The demo now includes **live database testing** using the real Supabase migration workflow:
 
-- 📊 Browse your database schema
-- 🧪 Apply policies to a real database
-- 👥 Test as different users
-- ✅ Verify RLS enforcement in real-time
+- 📁 **Save as Migration Files** - Generate timestamped migration files from your policies
+- 🔄 **Apply with Supabase CLI** - Use standard `supabase db reset` to apply migrations
+- 📊 **Browse Database Schema** - View all tables and columns from your local instance
+- 👥 **Test as Different Users** - Sign in as test users to verify RLS enforcement
+- ✅ **Verify in Real-Time** - See exactly which rows each user can access with RLS active
+
+This teaches you the **real Supabase development workflow** - the same way you'll deploy policies to production!
 
 Run the full demo locally with database:
 

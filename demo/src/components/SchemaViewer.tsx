@@ -17,7 +17,6 @@ import {
   ShieldOff,
   Loader2,
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 
 interface Column {
   name: string;
@@ -62,53 +61,12 @@ export default function SchemaViewer({
       setLoading(true);
       setError(null);
 
-      // Get list of tables
-      const { data: tablesData, error: tablesError } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public')
-        .order('table_name');
-
-      if (tablesError) throw tablesError;
-
-      if (!tablesData || tablesData.length === 0) {
-        // Fallback: Use hardcoded schema from our migrations
-        setTables(getHardcodedSchema());
-        setLoading(false);
-        return;
-      }
-
-      // Get columns for each table
-      const tablesWithColumns: TableInfo[] = await Promise.all(
-        tablesData.map(async ({ table_name }) => {
-          const { data: columnsData } = await supabase
-            .from('information_schema.columns')
-            .select('column_name, data_type, is_nullable, column_default')
-            .eq('table_schema', 'public')
-            .eq('table_name', table_name)
-            .order('ordinal_position');
-
-          const columns: Column[] =
-            columnsData?.map((col: Record<string, unknown>) => ({
-              name: col.column_name,
-              type: col.data_type,
-              nullable: col.is_nullable === 'YES',
-              default: col.column_default,
-            })) || [];
-
-          return {
-            name: table_name,
-            schema: 'public',
-            rls_enabled: true, // Assume RLS enabled for demo tables
-            columns,
-          };
-        })
-      );
-
-      setTables(tablesWithColumns);
+      // Use hardcoded schema from migrations since information_schema
+      // is not accessible via Supabase REST API
+      setTables(getHardcodedSchema());
     } catch (err) {
-      console.error('Error fetching schema:', err);
-      setError('Failed to fetch schema. Using demo schema instead.');
+      console.error('Error loading schema:', err);
+      setError('Failed to load schema.');
       setTables(getHardcodedSchema());
     } finally {
       setLoading(false);

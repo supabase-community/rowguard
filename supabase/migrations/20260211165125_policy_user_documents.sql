@@ -1,0 +1,1 @@
+CREATE POLICY user_documents ON documents FOR SELECT USING (user_id = auth.uid())
