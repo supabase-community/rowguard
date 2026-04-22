@@ -60,9 +60,9 @@ describe('Typed Rowguard', () => {
       .when(rg.column('posts', 'user_id').eq(rg.auth.uid()));
 
     const sql = policy.toSQL();
-    expect(sql).toContain('CREATE POLICY user_posts');
-    expect(sql).toContain('ON posts');
-    expect(sql).toContain('posts.user_id');
+    expect(sql).toContain('CREATE POLICY "user_posts"');
+    expect(sql).toContain('ON "posts"');
+    expect(sql).toContain('"posts"."user_id"');
   });
 
   it('supports string equality', () => {
@@ -73,7 +73,7 @@ describe('Typed Rowguard', () => {
       .when(rg.column('users', 'email').eq('test@example.com'));
 
     const sql = policy.toSQL();
-    expect(sql).toContain("users.email = 'test@example.com'");
+    expect(sql).toContain(`"users"."email" = 'test@example.com'`);
   });
 
   it('supports numeric comparisons', () => {
@@ -84,7 +84,7 @@ describe('Typed Rowguard', () => {
       .when(rg.column('users', 'age').gt(18));
 
     const sql = policy.toSQL();
-    expect(sql).toContain('users.age > 18');
+    expect(sql).toContain('"users"."age" > 18');
   });
 
   it('supports boolean equality', () => {
@@ -95,7 +95,7 @@ describe('Typed Rowguard', () => {
       .when(rg.column('posts', 'published').eq(true));
 
     const sql = policy.toSQL();
-    expect(sql).toContain('posts.published = TRUE');
+    expect(sql).toContain('"posts"."published" = TRUE');
   });
 
   it('supports chaining with and/or', () => {
@@ -111,9 +111,9 @@ describe('Typed Rowguard', () => {
       );
 
     const sql = policy.toSQL();
-    expect(sql).toContain('posts.user_id');
+    expect(sql).toContain('"posts"."user_id"');
     expect(sql).toContain('OR');
-    expect(sql).toContain('posts.published');
+    expect(sql).toContain('"posts"."published"');
   });
 
   it('supports null checks', () => {
@@ -124,7 +124,7 @@ describe('Typed Rowguard', () => {
       .when(rg.column('posts', 'user_id').isNotNull());
 
     const sql = policy.toSQL();
-    expect(sql).toContain('posts.user_id IS NOT NULL');
+    expect(sql).toContain('"posts"."user_id" IS NOT NULL');
   });
 
   it('supports isOwner helper', () => {
@@ -135,7 +135,7 @@ describe('Typed Rowguard', () => {
       .when(rg.column('posts', 'user_id').isOwner());
 
     const sql = policy.toSQL();
-    expect(sql).toContain('posts.user_id = auth.uid()');
+    expect(sql).toContain('"posts"."user_id" = auth.uid()');
   });
 
   it('supports isPublic helper', () => {
@@ -146,7 +146,7 @@ describe('Typed Rowguard', () => {
       .when(rg.column('posts', 'published').isPublic());
 
     const sql = policy.toSQL();
-    expect(sql).toContain('posts.published = TRUE');
+    expect(sql).toContain('"posts"."published" = TRUE');
   });
 
   it('supports IN operator with array', () => {
@@ -157,7 +157,7 @@ describe('Typed Rowguard', () => {
       .when(rg.column('posts', 'title').in(['Draft', 'Published']));
 
     const sql = policy.toSQL();
-    expect(sql).toContain('posts.title IN');
+    expect(sql).toContain('"posts"."title" IN');
     expect(sql).toContain("'Draft'");
     expect(sql).toContain("'Published'");
   });
@@ -170,7 +170,7 @@ describe('Typed Rowguard', () => {
       .when(rg.column('users', 'email').like('%@example.com'));
 
     const sql = policy.toSQL();
-    expect(sql).toContain("users.email LIKE '%@example.com'");
+    expect(sql).toContain(`"users"."email" LIKE '%@example.com'`);
   });
 
   it('supports ILIKE pattern matching', () => {
@@ -181,7 +181,7 @@ describe('Typed Rowguard', () => {
       .when(rg.column('users', 'email').ilike('%@EXAMPLE.COM'));
 
     const sql = policy.toSQL();
-    expect(sql).toContain("users.email ILIKE '%@EXAMPLE.COM'");
+    expect(sql).toContain(`"users"."email" ILIKE '%@EXAMPLE.COM'`);
   });
 
   it('supports multiple comparison operators', () => {
@@ -194,9 +194,9 @@ describe('Typed Rowguard', () => {
       );
 
     const sql = policy.toSQL();
-    expect(sql).toContain('users.age >= 18');
+    expect(sql).toContain('"users"."age" >= 18');
     expect(sql).toContain('AND');
-    expect(sql).toContain('users.age <= 65');
+    expect(sql).toContain('"users"."age" <= 65');
   });
 
   it('supports session variables with belongsToTenant', () => {
@@ -209,7 +209,7 @@ describe('Typed Rowguard', () => {
 
     const sql = policy.toSQL();
     expect(sql).toContain('RESTRICTIVE');
-    expect(sql).toContain('posts.user_id');
+    expect(sql).toContain('"posts"."user_id"');
     expect(sql).toContain(
       "current_setting('app.current_tenant_id', true)::INTEGER"
     );

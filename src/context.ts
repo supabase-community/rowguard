@@ -114,6 +114,7 @@ export const session = {
    * ```
    */
   get(key: string, type: SessionVariableType): ContextValue {
+    const safeKey = key.replace(/'/g, "''");
     return {
       type: 'context',
       contextType: 'session',
@@ -130,7 +131,7 @@ export const session = {
                 : type === 'timestamp'
                   ? '::TIMESTAMP'
                   : '';
-        return `current_setting('${key}', true)${typeCast}`;
+        return `current_setting('${safeKey}', true)${typeCast}`;
       },
     };
   },

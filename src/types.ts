@@ -136,6 +136,7 @@ export interface SubqueryDefinition {
   select: string | string[];
   where?: Condition;
   join?: JoinDefinition;
+  joins?: JoinDefinition[];
 }
 
 /**

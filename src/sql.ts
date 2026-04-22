@@ -1,5 +1,6 @@
 import {
   Condition,
+  ContextValue,
   SubqueryDefinition,
   ComparisonCondition,
   ComparisonOperator,
@@ -60,10 +61,13 @@ export function sql(expression: string): SQLExpression {
  * If identifier contains special characters or spaces, wrap in double quotes
  */
 export function escapeIdentifier(identifier: string): string {
-  if (/[^a-zA-Z0-9_]/.test(identifier)) {
-    return `"${identifier.replace(/"/g, '""')}"`;
+  if (identifier.includes('.')) {
+    return identifier
+      .split('.')
+      .map((part) => `"${part.replace(/"/g, '""')}"`)
+      .join('.');
   }
-  return identifier;
+  return `"${identifier.replace(/"/g, '""')}"`;
 }
 
 /**
@@ -126,7 +130,7 @@ export function escapeValue(
 export function createComparison(
   column: string,
   operator: ComparisonOperator,
-  value: string | number | boolean | Date | null | Condition | SQLExpression
+  value: string | number | boolean | Date | null | ContextValue | SQLExpression
 ): ComparisonCondition {
   const operatorMap: Record<ComparisonOperator, string> = {
     eq: '=',
@@ -162,13 +166,12 @@ export function subqueryToSQL(subquery: SubqueryDefinition): string {
 
   let sql = `SELECT ${select} FROM ${from}${alias}`;
 
-  if (subquery.join) {
-    const joinType = (subquery.join.type || 'inner').toUpperCase();
-    const joinTable = escapeIdentifier(subquery.join.table);
-    const joinAlias = subquery.join.alias
-      ? ` ${escapeIdentifier(subquery.join.alias)}`
-      : '';
-    sql += ` ${joinType} JOIN ${joinTable}${joinAlias} ON ${subquery.join.on.toSQL()}`;
+  const joins = subquery.joins ?? (subquery.join ? [subquery.join] : []);
+  for (const join of joins) {
+    const joinType = (join.type || 'inner').toUpperCase();
+    const joinTable = escapeIdentifier(join.table);
+    const joinAlias = join.alias ? ` ${escapeIdentifier(join.alias)}` : '';
+    sql += ` ${joinType} JOIN ${joinTable}${joinAlias} ON ${join.on.toSQL()}`;
   }
 
   if (subquery.where) {

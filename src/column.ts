@@ -5,6 +5,7 @@
 
 import {
   Condition,
+  ContextValue,
   PatternCondition,
   MembershipCondition,
   NullCondition,
@@ -127,8 +128,7 @@ export class ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     const normalizedValue =
@@ -154,8 +154,7 @@ export class ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     const normalizedValue =
@@ -182,8 +181,7 @@ export class ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     const normalizedValue =
@@ -209,8 +207,7 @@ export class ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     const normalizedValue =
@@ -236,8 +233,7 @@ export class ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     const normalizedValue =
@@ -263,8 +259,7 @@ export class ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     const normalizedValue =
@@ -346,6 +341,7 @@ export class ColumnBuilder {
       value: values,
       toSQL(): string {
         if (Array.isArray(values)) {
+          if (values.length === 0) return 'FALSE';
           const valuesList = values.map(escapeValue).join(', ');
           return `${escapeIdentifier(colName)} IN (${valuesList})`;
         } else {
@@ -548,17 +544,18 @@ export class ColumnBuilder {
   isMemberOf(
     joinTable: string,
     foreignKey: string,
-    localKey: string = 'id'
+    localKey: string = 'id',
+    userIdColumn: string = 'user_id'
   ): ConditionChain {
     return new ConditionChain({
       type: 'helper',
       helperType: 'isMemberOf',
-      params: { joinTable, foreignKey, localKey },
+      params: { joinTable, foreignKey, localKey, userIdColumn },
       toSQL(): string {
         return `${escapeIdentifier(localKey)} IN (
           SELECT ${escapeIdentifier(foreignKey)}
           FROM ${escapeIdentifier(joinTable)}
-          WHERE ${escapeIdentifier('user_id')} = ${auth.uid().toSQL()}
+          WHERE ${escapeIdentifier(userIdColumn)} = ${auth.uid().toSQL()}
         )`;
       },
     } as HelperCondition);

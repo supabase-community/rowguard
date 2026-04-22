@@ -6,12 +6,18 @@ on:
   pull_request:
     branches: [main, master]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -19,7 +25,7 @@ jobs:
           version: 10.28.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -36,17 +42,71 @@ jobs:
       - name: Run unit tests
         run: pnpm test
 
-      - name: Start Supabase
-        run: npx supabase start
-        env:
-          SUPABASE_DB_PASSWORD: postgres
+  integration-tests:
+    name: Integration Tests (E2E)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-      - name: Wait for Supabase to be ready
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build
+        run: pnpm build
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Supabase Docker images
+        id: docker-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/supabase-docker-cache
+          key: supabase-docker-${{ runner.os }}-${{ hashFiles('supabase/config.toml') }}
+          restore-keys: supabase-docker-${{ runner.os }}-
+
+      - name: Load cached Docker images
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/supabase-docker-cache/images.tar
+
+      - name: Start Supabase (db only)
+        run: supabase start --exclude auth,rest,realtime,storage,imgproxy,studio,inbucket,vector,meta,edge-runtime,logflare
+
+      - name: Save Docker images to cache
+        if: steps.docker-cache.outputs.cache-hit != 'true'
         run: |
-          echo "Waiting for Supabase to start (may take several minutes on first run)..."
-          timeout 300 bash -c 'until npx supabase status 2>/dev/null | grep -q "Project URL"; do echo "Waiting for Supabase..."; sleep 5; done'
-          echo "Supabase is ready!"
-          npx supabase status
+          mkdir -p /tmp/supabase-docker-cache
+          docker save $(docker images --format '{{.Repository}}:{{.Tag}}' \
+            | grep -E '^(supabase/|public\.ecr\.aws/supabase/)' \
+            | grep -v '<none>') \
+            -o /tmp/supabase-docker-cache/images.tar
+
+      - name: Wait for database to be ready
+        run: |
+          timeout 60 bash -c 'until pg_isready -h 127.0.0.1 -p 54322 -U postgres -q; do sleep 2; done'
+
+      - name: Verify database schema
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c \
+            "SELECT auth.uid() IS NULL AS uid_fn_exists, EXISTS(SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') AS role_exists;" \
+            | grep -E "t.*t" || (echo "ERROR: auth.uid() or authenticated role missing" && exit 1)
 
       - name: Run integration tests
         env:
@@ -55,7 +115,29 @@ jobs:
 
       - name: Stop Supabase
         if: always()
-        run: npx supabase stop
+        run: supabase stop
+
+  demo:
+    name: Demo Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install root dependencies
+        run: pnpm install
 
       - name: Install demo dependencies
         working-directory: demo

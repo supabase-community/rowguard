@@ -14,7 +14,7 @@ export * from './subquery-builder';
 
 export { policy, PolicyBuilder, policies } from './policy-builder';
 export { auth, session, currentUser } from './context';
-export { createPolicyGroup, policyGroupToSQL } from './composition';
+export { createPolicyGroup, policyGroupToSQL, applyPolicyGroup, crud, tenantGroup } from './composition';
 export {
   column,
   ColumnBuilder,
