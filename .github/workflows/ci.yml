@@ -91,10 +91,12 @@ jobs:
         if: steps.docker-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p /tmp/supabase-docker-cache
-          docker save $(docker images --format '{{.Repository}}:{{.Tag}}' \
-            | grep -E '^(supabase/|public\.ecr\.aws/supabase/)' \
-            | grep -v '<none>') \
-            -o /tmp/supabase-docker-cache/images.tar
+          IMAGES=$(docker images --format '{{.Repository}}:{{.Tag}}' \
+            | grep -E '^(supabase/|public\.ecr\.aws/supabase/|ghcr\.io/supabase/)' \
+            | grep -v '<none>') && \
+          if [ -n "$IMAGES" ]; then
+            docker save $IMAGES -o /tmp/supabase-docker-cache/images.tar
+          fi
 
       - name: Wait for database to be ready
         run: |
@@ -138,6 +140,9 @@ jobs:
 
       - name: Install root dependencies
         run: pnpm install
+
+      - name: Build
+        run: pnpm build
 
       - name: Install demo dependencies
         working-directory: demo

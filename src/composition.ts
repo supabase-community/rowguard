@@ -2,7 +2,7 @@
  * Policy composition utilities
  */
 
-import { PolicyBuilder, policy, policies } from './policy-builder';
+import { PolicyBuilder, policies } from './policy-builder';
 import { SQLGenerationOptions } from './types';
 
 export interface PolicyGroup {

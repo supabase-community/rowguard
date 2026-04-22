@@ -1,6 +1,5 @@
 import {
   Condition,
-  ContextValue,
   SubqueryDefinition,
   ComparisonCondition,
   ComparisonOperator,
@@ -130,7 +129,7 @@ export function escapeValue(
 export function createComparison(
   column: string,
   operator: ComparisonOperator,
-  value: string | number | boolean | Date | null | ContextValue | SQLExpression
+  value: string | number | boolean | Date | null | Condition | SQLExpression
 ): ComparisonCondition {
   const operatorMap: Record<ComparisonOperator, string> = {
     eq: '=',
