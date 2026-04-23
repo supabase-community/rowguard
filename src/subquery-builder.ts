@@ -184,14 +184,16 @@ export class SubqueryBuilder {
     }
 
     if (this._joins.length > 0) {
-      // For now, only support single join (can be extended later)
-      const join = this._joins[0];
-      result.join = {
-        table: join.table,
-        alias: join.alias,
-        on: join.on,
-        type: join.type,
-      } as JoinDefinition;
+      result.joins = this._joins.map(
+        (j) =>
+          ({
+            table: j.table,
+            alias: j.alias,
+            on: j.on,
+            type: j.type,
+          }) as JoinDefinition
+      );
+      result.join = result.joins[0];
     }
 
     return result;

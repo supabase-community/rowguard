@@ -8,14 +8,14 @@ import { PolicyBuilder } from './policy-builder';
 import { auth, session } from './context';
 import type {
   SQLExpression,
-  Condition,
   ComparisonCondition,
   PatternCondition,
   MembershipCondition,
   NullCondition,
 } from './types';
 import { SubqueryBuilder } from './subquery-builder';
-import { escapeIdentifier, escapeValue } from './sql';
+import { escapeIdentifier, escapeValue, subqueryToSQL } from './sql';
+import type { ContextValue } from './types';
 
 /**
  * Helper to escape qualified column references (table.column)
@@ -31,7 +31,7 @@ function createQualifiedComparison(
   table: string,
   column: string,
   operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte',
-  value: unknown
+  value: string | number | boolean | Date | null | ContextValue | SQLExpression
 ): ComparisonCondition {
   const operatorMap = {
     eq: '=',
@@ -46,9 +46,9 @@ function createQualifiedComparison(
     type: 'comparison',
     column: `${table}.${column}`,
     operator,
-    value: value as any,
+    value,
     toSQL(): string {
-      return `${escapeQualifiedIdentifier(table, column)} ${operatorMap[operator]} ${escapeValue(value as any)}`;
+      return `${escapeQualifiedIdentifier(table, column)} ${operatorMap[operator]} ${escapeValue(value)}`;
     },
   };
 }
@@ -127,8 +127,7 @@ export class TypedColumnBuilder<_T = unknown> extends ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     return new ConditionChain(
@@ -146,8 +145,7 @@ export class TypedColumnBuilder<_T = unknown> extends ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     return new ConditionChain(
@@ -165,8 +163,7 @@ export class TypedColumnBuilder<_T = unknown> extends ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     return new ConditionChain(
@@ -184,8 +181,7 @@ export class TypedColumnBuilder<_T = unknown> extends ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     return new ConditionChain(
@@ -203,8 +199,7 @@ export class TypedColumnBuilder<_T = unknown> extends ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     return new ConditionChain(
@@ -222,8 +217,7 @@ export class TypedColumnBuilder<_T = unknown> extends ColumnBuilder {
       | boolean
       | Date
       | null
-      | Condition
-      | ConditionChain
+      | ContextValue
       | SQLExpression
   ): ConditionChain {
     return new ConditionChain(
@@ -280,14 +274,15 @@ export class TypedColumnBuilder<_T = unknown> extends ColumnBuilder {
       value: values as any,
       toSQL(): string {
         if (Array.isArray(values)) {
+          if (values.length === 0) return 'FALSE';
           const valuesList = values
             .map((v) => escapeValue(v as any))
             .join(', ');
           return `${escapeQualifiedIdentifier(table, col)} IN (${valuesList})`;
         } else {
-          const subquerySQL = (values as SubqueryBuilder).toSubquery();
-          // Simple subquery SQL generation
-          return `${escapeQualifiedIdentifier(table, col)} IN (SELECT ${escapeIdentifier(subquerySQL.select as string)} FROM ${escapeIdentifier(subquerySQL.from)})`;
+          return `${escapeQualifiedIdentifier(table, col)} IN ${subqueryToSQL(
+            (values as SubqueryBuilder).toSubquery()
+          )}`;
         }
       },
     } as MembershipCondition);
@@ -352,26 +347,27 @@ export class TypedColumnBuilder<_T = unknown> extends ColumnBuilder {
 
   // Helper methods work for all types - delegate to parent but need to override for qualified refs
   isOwner(): ConditionChain {
-    return this.eq(auth.uid() as any);
+    return this.eq(auth.uid());
   }
 
   isPublic(): ConditionChain {
-    return this.eq(true as any);
+    return this.eq(true);
   }
 
   belongsToTenant(
     sessionKey: string = 'app.current_tenant_id'
   ): ConditionChain {
-    return this.eq(session.get(sessionKey, 'integer') as any);
+    return this.eq(session.get(sessionKey, 'integer'));
   }
 
   // For methods that need subqueries, we can delegate to parent since they handle the column name properly
   isMemberOf(
     joinTable: string,
     foreignKey: string,
-    localKey?: string
+    localKey?: string,
+    userIdColumn?: string
   ): ConditionChain {
-    return super.isMemberOf(joinTable, foreignKey, localKey);
+    return super.isMemberOf(joinTable, foreignKey, localKey, userIdColumn);
   }
 
   userBelongsTo(

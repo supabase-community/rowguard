@@ -16,6 +16,12 @@ import type {
   SubqueryDefinition,
 } from './types';
 import { escapeIdentifier, sanitizePolicyName } from './sql';
+
+const POSTGRES_ROLE_KEYWORDS = new Set(['public', 'current_user', 'current_role', 'session_user']);
+
+function escapeRole(role: string): string {
+  return POSTGRES_ROLE_KEYWORDS.has(role.toLowerCase()) ? role : escapeIdentifier(role);
+}
 import { ConditionChain, column, hasRole } from './column';
 import { SubqueryBuilder } from './subquery-builder';
 
@@ -88,12 +94,13 @@ function processSubqueryJoin(
   aliasMap: AliasMap,
   processCondition: (cond: Condition, table: string) => void
 ): void {
-  if (!subquery.join) return;
-
-  const joinTableAlias = subquery.join.alias || subquery.join.table;
-  registerAlias(subquery.join.alias, subquery.join.table, aliasMap);
-  processCondition(subquery.join.on, mainTableAlias);
-  processCondition(subquery.join.on, joinTableAlias);
+  const joins = subquery.joins ?? (subquery.join ? [subquery.join] : []);
+  for (const join of joins) {
+    const joinTableAlias = join.alias || join.table;
+    registerAlias(join.alias, join.table, aliasMap);
+    processCondition(join.on, mainTableAlias);
+    processCondition(join.on, joinTableAlias);
+  }
 }
 
 function processSubqueryForIndexing(
@@ -183,7 +190,8 @@ function processHelperCondition(
     const joinTable = helper.params.joinTable as string;
     const foreignKey = helper.params.foreignKey as string;
     addColumn(joinTable, foreignKey);
-    addColumn(joinTable, 'user_id');
+    const userIdColumn = (helper.params.userIdColumn as string) || 'user_id';
+    addColumn(joinTable, userIdColumn);
   }
 }
 
@@ -285,6 +293,26 @@ function generateIndexSQL(tableColumns: Map<string, Set<string>>): string[] {
   });
 
   return indexes;
+}
+
+function collectMembershipTables(conditions: Condition[]): string[] {
+  const tables = new Set<string>();
+  function walk(c: Condition) {
+    if (c.type === 'helper' && (c as HelperCondition).helperType === 'isMemberOf') {
+      tables.add((c as HelperCondition).params.joinTable as string);
+    }
+    if (c.type === 'logical') {
+      (c as LogicalCondition).conditions.forEach(walk);
+    }
+    if (c.type === 'membership' && (c as MembershipCondition).operator === 'in') {
+      const val = (c as MembershipCondition).value;
+      if (val instanceof SubqueryBuilder) {
+        tables.add(val.toSubquery().from);
+      }
+    }
+  }
+  conditions.forEach(walk);
+  return [...tables];
 }
 
 /**
@@ -654,7 +682,7 @@ export class PolicyBuilder {
     parts.push(`FOR ${def.operation}`);
 
     if (def.role) {
-      parts.push(`TO ${escapeIdentifier(def.role)}`);
+      parts.push(`TO ${escapeRole(def.role)}`);
     }
 
     if (def.using) {
@@ -667,39 +695,62 @@ export class PolicyBuilder {
 
     const policySQL = parts.join(' ');
 
-    // Generate indexes if requested
     if (options?.includeIndexes) {
       const tableColumns = new Map<string, Set<string>>();
-
-      // Extract columns from USING clause
-      if (def.using) {
-        const usingColumns = extractIndexableColumns(def.using, def.table);
-        usingColumns.forEach((columns, table) => {
-          if (!tableColumns.has(table)) {
-            tableColumns.set(table, new Set<string>());
-          }
-          columns.forEach((col) => tableColumns.get(table)!.add(col));
+      const mergeColumns = (condition: Condition) => {
+        extractIndexableColumns(condition, def.table).forEach((cols, tbl) => {
+          if (!tableColumns.has(tbl)) tableColumns.set(tbl, new Set());
+          cols.forEach((col) => tableColumns.get(tbl)!.add(col));
         });
-      }
+      };
 
-      // Extract columns from WITH CHECK clause
-      if (def.withCheck) {
-        const checkColumns = extractIndexableColumns(def.withCheck, def.table);
-        checkColumns.forEach((columns, table) => {
-          if (!tableColumns.has(table)) {
-            tableColumns.set(table, new Set<string>());
-          }
-          columns.forEach((col) => tableColumns.get(table)!.add(col));
-        });
-      }
+      if (def.using) mergeColumns(def.using);
+      if (def.withCheck && def.withCheck !== def.using) mergeColumns(def.withCheck);
 
       if (tableColumns.size > 0) {
-        const indexSQLs = generateIndexSQL(tableColumns);
-        return `${policySQL};\n\n${indexSQLs.join('\n')}`;
+        return `${policySQL};\n\n${generateIndexSQL(tableColumns).join('\n')}`;
       }
     }
 
     return policySQL;
+  }
+
+  /**
+   * Returns the join/subquery tables referenced by membership conditions in this policy.
+   * Used by policyGroupToSQL to emit companion-policy hints.
+   * @internal
+   */
+  membershipTables(): string[] {
+    const conditions = [this.state.using, this.state.withCheck].filter(Boolean) as Condition[];
+    return collectMembershipTables(conditions);
+  }
+
+  /**
+   * Validate the generated SQL against a live database without committing.
+   * Wraps the check in its own transaction — do not call inside another transaction.
+   *
+   * Throws if the SQL is rejected by Postgres (syntax error, unknown table, etc.).
+   *
+   * @param client A pg Client or PoolClient
+   *
+   * @example
+   * ```typescript
+   * const client = await pool.connect();
+   * await policy('p').on('documents').read().when(column('user_id').isOwner())
+   *   .validate(client);
+   * client.release();
+   * ```
+   */
+  async validate(client: { query(sql: string): Promise<unknown> }): Promise<void> {
+    const sql = this.toSQL();
+    await client.query('BEGIN');
+    try {
+      await client.query(sql);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    }
+    await client.query('ROLLBACK');
   }
 }
 
@@ -774,22 +825,10 @@ export const policies = {
     return ops.map((op) => {
       const p = policy(`${table}_${op.toLowerCase()}_owner`).on(table).for(op);
 
-      // SELECT and DELETE need USING (read filter)
-      if (
-        op === 'SELECT' ||
-        op === 'DELETE' ||
-        op === 'UPDATE' ||
-        op === 'ALL'
-      ) {
+      if (op === 'SELECT' || op === 'DELETE' || op === 'UPDATE' || op === 'ALL') {
         p.when(column(userIdColumn).isOwner());
       }
-      // INSERT, UPDATE, and DELETE need WITH CHECK (write validation)
-      if (
-        op === 'INSERT' ||
-        op === 'UPDATE' ||
-        op === 'DELETE' ||
-        op === 'ALL'
-      ) {
+      if (op === 'INSERT' || op === 'UPDATE' || op === 'ALL') {
         p.withCheck(column(userIdColumn).isOwner());
       }
 

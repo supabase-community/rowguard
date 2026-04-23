@@ -26,12 +26,17 @@ import {
   session,
   createPolicyGroup,
   policyGroupToSQL,
+  applyPolicyGroup,
+  crud,
+  tenantGroup,
   column,
   alwaysTrue,
   hasRole,
   auth,
   from,
+  sql,
 } from '../src/index';
+import { createRowguard } from '../src/typed';
 
 // Database connection configuration
 // Default to Supabase local instance (port 54322) if DATABASE_URL is not set
@@ -1306,16 +1311,16 @@ describe('RLS Integration Tests', () => {
       // 4. organization_members.user_id (used in WHERE clause)
 
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_documents_id ON documents (id)'
+        'CREATE INDEX IF NOT EXISTS "idx_documents_id" ON "documents" ("id")'
       );
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_organizations_id ON organizations (id)'
+        'CREATE INDEX IF NOT EXISTS "idx_organizations_id" ON "organizations" ("id")'
       );
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_organization_members_organization_id ON organization_members (organization_id)'
+        'CREATE INDEX IF NOT EXISTS "idx_organization_members_organization_id" ON "organization_members" ("organization_id")'
       );
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_organization_members_user_id ON organization_members (user_id)'
+        'CREATE INDEX IF NOT EXISTS "idx_organization_members_user_id" ON "organization_members" ("user_id")'
       );
     });
 
@@ -1342,13 +1347,13 @@ describe('RLS Integration Tests', () => {
 
       // Verify indexes are generated for join condition columns (using actual table names, not aliases)
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_projects_id ON projects (id)'
+        'CREATE INDEX IF NOT EXISTS "idx_projects_id" ON "projects" ("id")'
       );
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON project_members (project_id)'
+        'CREATE INDEX IF NOT EXISTS "idx_project_members_project_id" ON "project_members" ("project_id")'
       );
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_project_members_user_id ON project_members (user_id)'
+        'CREATE INDEX IF NOT EXISTS "idx_project_members_user_id" ON "project_members" ("user_id")'
       );
     });
 
@@ -1375,10 +1380,10 @@ describe('RLS Integration Tests', () => {
 
       // Verify indexes are generated for join condition (works for all join types)
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_organizations_id ON organizations (id)'
+        'CREATE INDEX IF NOT EXISTS "idx_organizations_id" ON "organizations" ("id")'
       );
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_organization_members_organization_id ON organization_members (organization_id)'
+        'CREATE INDEX IF NOT EXISTS "idx_organization_members_organization_id" ON "organization_members" ("organization_id")'
       );
     });
 
@@ -1409,10 +1414,10 @@ describe('RLS Integration Tests', () => {
       // Verify indexes are generated for join condition columns
       // The join condition has p.id = pm.project_id, so both should be indexed
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_projects_id ON projects (id)'
+        'CREATE INDEX IF NOT EXISTS "idx_projects_id" ON "projects" ("id")'
       );
       expect(sql).toContain(
-        'CREATE INDEX IF NOT EXISTS idx_project_members_project_id ON project_members (project_id)'
+        'CREATE INDEX IF NOT EXISTS "idx_project_members_project_id" ON "project_members" ("project_id")'
       );
     });
 
@@ -1440,19 +1445,1424 @@ describe('RLS Integration Tests', () => {
 
       // Verify that indexes use actual table names (organizations, organization_members)
       // not aliases (org, om)
-      expect(sql).toContain('idx_organizations_id ON organizations');
+      expect(sql).toContain('"idx_organizations_id" ON "organizations"');
       expect(sql).toContain(
-        'idx_organization_members_organization_id ON organization_members'
+        '"idx_organization_members_organization_id" ON "organization_members"'
       );
       expect(sql).toContain(
-        'idx_organization_members_user_id ON organization_members'
+        '"idx_organization_members_user_id" ON "organization_members"'
       );
 
       // Verify aliases are NOT used in index creation
       expect(sql).not.toContain('idx_org_');
       expect(sql).not.toContain('idx_om_');
-      expect(sql).not.toContain('ON org (');
-      expect(sql).not.toContain('ON om (');
+      expect(sql).not.toContain('ON "org" (');
+      expect(sql).not.toContain('ON "om" (');
+    });
+  });
+
+  describe('Fixed bugs', () => {
+    test('empty IN array denies all access', async () => {
+      const p = policy('empty_in_policy')
+        .on('documents')
+        .for('SELECT')
+        .when(column('status').in([]));
+
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+
+        const result = await client.query('SELECT id FROM documents;');
+        expect(result.rows).toHaveLength(0);
+      } finally {
+        client.release();
+      }
+    });
+
+    test('isMemberOf with custom userIdColumn', async () => {
+      await adminClient.query(`
+        CREATE TABLE IF NOT EXISTS project_member_custom (
+          project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+          member_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+          PRIMARY KEY (project_id, member_user_id)
+        );
+        ALTER TABLE project_member_custom ENABLE ROW LEVEL SECURITY;
+        GRANT SELECT ON project_member_custom TO authenticated;
+      `);
+
+      await adminClient.query(
+        `INSERT INTO project_member_custom (project_id, member_user_id)
+         SELECT id, $1 FROM projects WHERE created_by = $2 LIMIT 1;`,
+        [testData.users.user1, testData.users.user2]
+      );
+
+      const membersPolicy = policy('pmc_select')
+        .on('project_member_custom')
+        .for('SELECT')
+        .when(alwaysTrue());
+      await adminClient.query(membersPolicy.toSQL());
+
+      const p = policy('custom_member_access')
+        .on('projects')
+        .for('SELECT')
+        .when(
+          column('id').isMemberOf(
+            'project_member_custom',
+            'project_id',
+            'id',
+            'member_user_id'
+          )
+        );
+
+      const sqlOut = p.toSQL();
+      expect(sqlOut).toContain('"member_user_id"');
+      await adminClient.query(sqlOut);
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+
+        const result = await client.query(
+          'SELECT id FROM projects ORDER BY name;'
+        );
+        expect(result.rows.length).toBeGreaterThan(0);
+      } finally {
+        client.release();
+        await adminClient.query('DROP TABLE IF EXISTS project_member_custom CASCADE;');
+      }
+    });
+
+    test('session key single quotes are escaped to prevent injection', () => {
+      const ctx = session.get("bad'key", 'text');
+      expect(ctx.toSQL()).toBe("current_setting('bad''key', true)");
+      expect(ctx.toSQL()).not.toContain("bad'key");
+    });
+  });
+
+  describe('Comparison Operators', () => {
+    test('neq filters out matching rows', async () => {
+      const p = policy('posts_neq')
+        .on('posts')
+        .for('SELECT')
+        .when(column('status').neq('draft'));
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        const result = await client.query(
+          'SELECT id, title, status FROM posts ORDER BY title;'
+        );
+        expect(result.rows).toHaveLength(1);
+        expect(result.rows[0].status).toBe('published');
+      } finally {
+        client.release();
+      }
+    });
+
+    test.each([
+      ['gt',  (c: ReturnType<typeof column>) => c.gt(3),  '',                 5],
+      ['gte', (c: ReturnType<typeof column>) => c.gte(5), '',                 5],
+      ['lt',  (c: ReturnType<typeof column>) => c.lt(3),  'WHERE priority > 0', 1],
+      ['lte', (c: ReturnType<typeof column>) => c.lte(1), 'WHERE priority > 0', 1],
+    ] as const)(
+      '%s filters documents by priority threshold',
+      async (op, condFn, whereClause, expectedPriority) => {
+        await adminClient.query(
+          `ALTER TABLE documents ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 0;`
+        );
+        try {
+          await adminClient.query(`UPDATE documents SET priority = 5 WHERE id = $1;`, [testData.documents.user1Private]);
+          await adminClient.query(`UPDATE documents SET priority = 1 WHERE id = $1;`, [testData.documents.user1Public]);
+
+          const p = policy(`docs_${op}`).on('documents').for('SELECT').when(condFn(column('priority')));
+          await adminClient.query(p.toSQL());
+
+          const client = await pool.connect();
+          try {
+            await client.query('SET ROLE authenticated;');
+            await setCurrentUser(client, testData.users.user1);
+            const result = await client.query(
+              `SELECT id, priority FROM documents ${whereClause};`
+            );
+            expect(result.rows).toHaveLength(1);
+            expect(result.rows[0].priority).toBe(expectedPriority);
+          } finally {
+            client.release();
+          }
+        } finally {
+          await adminClient.query(`ALTER TABLE documents DROP COLUMN IF EXISTS priority CASCADE;`);
+        }
+      }
+    );
+  });
+
+  describe('Pattern Matching', () => {
+    test('like filters by pattern', async () => {
+      const p = policy('docs_like')
+        .on('documents')
+        .for('SELECT')
+        .when(column('title').like('User1%'));
+      await adminClient.query(p.toSQL());
+
+      const user1Client = await pool.connect();
+      try {
+        await user1Client.query('SET ROLE authenticated;');
+        await setCurrentUser(user1Client, testData.users.user1);
+        const u1 = await user1Client.query(
+          'SELECT title FROM documents ORDER BY title;'
+        );
+        expect(u1.rows).toHaveLength(2);
+        expect(u1.rows.every((r) => r.title.startsWith('User1'))).toBe(true);
+      } finally {
+        user1Client.release();
+      }
+    });
+
+    test('ilike matches case-insensitively', async () => {
+      const p = policy('docs_ilike')
+        .on('documents')
+        .for('SELECT')
+        .when(column('title').ilike('user1%'));
+      await adminClient.query(p.toSQL());
+
+      const user1Client = await pool.connect();
+      try {
+        await user1Client.query('SET ROLE authenticated;');
+        await setCurrentUser(user1Client, testData.users.user1);
+        const u1 = await user1Client.query(
+          'SELECT title FROM documents ORDER BY title;'
+        );
+        expect(u1.rows).toHaveLength(2);
+        expect(u1.rows.every((r) => r.title.startsWith('User1'))).toBe(true);
+      } finally {
+        user1Client.release();
+      }
+    });
+  });
+
+  describe('NULL Checks', () => {
+    test('isNull allows access to non-deleted rows', async () => {
+      await adminClient.query(
+        `ALTER TABLE documents ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;`
+      );
+      try {
+        await adminClient.query(
+          `UPDATE documents SET deleted_at = NOW() WHERE id = $1;`,
+          [testData.documents.user1Private]
+        );
+
+        const p = policy('docs_not_deleted')
+          .on('documents')
+          .for('SELECT')
+          .when(
+            column('user_id').isOwner().and(column('deleted_at').isNull())
+          );
+        await adminClient.query(p.toSQL());
+
+        const client = await pool.connect();
+        try {
+          await client.query('SET ROLE authenticated;');
+          await setCurrentUser(client, testData.users.user1);
+          const rows = await client.query(
+            'SELECT id, title FROM documents ORDER BY title;'
+          );
+          expect(rows.rows).toHaveLength(1);
+          expect(rows.rows[0].title).toBe('User1 Public Doc');
+        } finally {
+          client.release();
+        }
+      } finally {
+        await adminClient.query(
+          `ALTER TABLE documents DROP COLUMN IF EXISTS deleted_at CASCADE;`
+        );
+      }
+    });
+
+    test('isNotNull denies access to non-deleted rows', async () => {
+      await adminClient.query(
+        `ALTER TABLE documents ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;`
+      );
+      try {
+        await adminClient.query(
+          `UPDATE documents SET deleted_at = NOW() WHERE id = $1;`,
+          [testData.documents.user1Private]
+        );
+
+        const p = policy('docs_deleted')
+          .on('documents')
+          .for('SELECT')
+          .when(column('deleted_at').isNotNull());
+        await adminClient.query(p.toSQL());
+
+        const client = await pool.connect();
+        try {
+          await client.query('SET ROLE authenticated;');
+          await setCurrentUser(client, testData.users.user1);
+          const rows = await client.query(
+            'SELECT id, title FROM documents;'
+          );
+          expect(rows.rows).toHaveLength(1);
+          expect(rows.rows[0].title).toBe('User1 Private Doc');
+        } finally {
+          client.release();
+        }
+      } finally {
+        await adminClient.query(
+          `ALTER TABLE documents DROP COLUMN IF EXISTS deleted_at CASCADE;`
+        );
+      }
+    });
+  });
+
+  describe('Array Contains', () => {
+    test('contains filters array columns', async () => {
+      await adminClient.query(
+        `ALTER TABLE documents ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';`
+      );
+      try {
+        await adminClient.query(
+          `UPDATE documents SET tags = '{urgent,important}' WHERE id = $1;`,
+          [testData.documents.user1Private]
+        );
+        await adminClient.query(
+          `UPDATE documents SET tags = '{public}' WHERE id = $1;`,
+          [testData.documents.user1Public]
+        );
+
+        const p = policy('docs_contains')
+          .on('documents')
+          .for('SELECT')
+          .when(
+            column('user_id')
+              .isOwner()
+              .and(column('tags').contains(['urgent']))
+          );
+        await adminClient.query(p.toSQL());
+
+        const client = await pool.connect();
+        try {
+          await client.query('SET ROLE authenticated;');
+          await setCurrentUser(client, testData.users.user1);
+          const rows = await client.query(
+            'SELECT id, title FROM documents;'
+          );
+          expect(rows.rows).toHaveLength(1);
+          expect(rows.rows[0].title).toBe('User1 Private Doc');
+        } finally {
+          client.release();
+        }
+      } finally {
+        await adminClient.query(
+          `ALTER TABLE documents DROP COLUMN IF EXISTS tags CASCADE;`
+        );
+      }
+    });
+  });
+
+  describe('Membership - userBelongsTo', () => {
+    test('userBelongsTo filters via subquery membership', async () => {
+      const orgId = uuidv4();
+      await adminClient.query(
+        `INSERT INTO organizations (id, name) VALUES ($1, 'Org 1');`,
+        [orgId]
+      );
+      await adminClient.query(
+        `INSERT INTO organization_members (organization_id, user_id) VALUES ($1, $2);`,
+        [orgId, testData.users.user1]
+      );
+
+      const membersPolicy = policy('org_members_select')
+        .on('organization_members')
+        .for('SELECT')
+        .when(alwaysTrue());
+      await adminClient.query(membersPolicy.toSQL());
+
+      const p = policy('orgs_user_belongs')
+        .on('organizations')
+        .for('SELECT')
+        .when(
+          column('id').userBelongsTo('organization_members', 'organization_id')
+        );
+      await adminClient.query(p.toSQL());
+
+      const u1 = await pool.connect();
+      try {
+        await u1.query('SET ROLE authenticated;');
+        await setCurrentUser(u1, testData.users.user1);
+        const r = await u1.query('SELECT id, name FROM organizations;');
+        expect(r.rows).toHaveLength(1);
+        expect(r.rows[0].name).toBe('Org 1');
+      } finally {
+        u1.release();
+      }
+
+      const u2 = await pool.connect();
+      try {
+        await u2.query('SET ROLE authenticated;');
+        await setCurrentUser(u2, testData.users.user2);
+        const r = await u2.query('SELECT id, name FROM organizations;');
+        expect(r.rows).toHaveLength(0);
+      } finally {
+        u2.release();
+      }
+    });
+  });
+
+  describe('Date Comparisons', () => {
+    test('releasedBefore filters by date', async () => {
+      await adminClient.query(
+        `ALTER TABLE posts ADD COLUMN IF NOT EXISTS release_date TIMESTAMP;`
+      );
+      try {
+        await adminClient.query(
+          `UPDATE posts SET release_date = NOW() - INTERVAL '1 day' WHERE id = $1;`,
+          [testData.posts.user1Published]
+        );
+        await adminClient.query(
+          `UPDATE posts SET release_date = NOW() + INTERVAL '30 days' WHERE id = $1;`,
+          [testData.posts.user1Draft]
+        );
+
+        const p = policy('posts_released')
+          .on('posts')
+          .for('SELECT')
+          .when(
+            column('user_id')
+              .isOwner()
+              .and(column('release_date').releasedBefore())
+          );
+        await adminClient.query(p.toSQL());
+
+        const client = await pool.connect();
+        try {
+          await client.query('SET ROLE authenticated;');
+          await setCurrentUser(client, testData.users.user1);
+          const rows = await client.query(
+            'SELECT id, title FROM posts;'
+          );
+          expect(rows.rows).toHaveLength(1);
+          expect(rows.rows[0].title).toBe('User1 Published');
+        } finally {
+          client.release();
+        }
+      } finally {
+        await adminClient.query(
+          `ALTER TABLE posts DROP COLUMN IF EXISTS release_date CASCADE;`
+        );
+      }
+    });
+  });
+
+  describe('Session Variable Types', () => {
+    test('session.get text type filters correctly', async () => {
+      await adminClient.query(
+        `ALTER TABLE tenant_data ADD COLUMN IF NOT EXISTS region TEXT;`
+      );
+      try {
+        await adminClient.query(
+          `UPDATE tenant_data SET region = 'us-east' WHERE tenant_id = 1;`
+        );
+
+        const p = policy('td_region')
+          .on('tenant_data')
+          .for('SELECT')
+          .when(column('region').eq(session.get('app.region', 'text')));
+        await adminClient.query(p.toSQL());
+
+        const client = await pool.connect();
+        try {
+          await client.query('SET ROLE authenticated;');
+          await setCurrentUser(client, testData.users.user1);
+          await client.query(`SET app.region = 'us-east';`);
+          const rows = await client.query(
+            'SELECT id, name FROM tenant_data ORDER BY name;'
+          );
+          expect(rows.rows.length).toBeGreaterThan(0);
+          expect(rows.rows.every((r) => r.name.includes('Tenant 1'))).toBe(true);
+        } finally {
+          client.release();
+        }
+      } finally {
+        await adminClient.query(
+          `ALTER TABLE tenant_data DROP COLUMN IF EXISTS region CASCADE;`
+        );
+      }
+    });
+
+    test('session.get uuid type filters correctly', async () => {
+      const p = policy('docs_target_user')
+        .on('documents')
+        .for('SELECT')
+        .when(
+          column('user_id').eq(session.get('app.target_user_id', 'uuid'))
+        );
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        await client.query(
+          `SET app.target_user_id = ${escapeLiteral(testData.users.user1)};`
+        );
+        const rows = await client.query(
+          'SELECT id, title FROM documents ORDER BY title;'
+        );
+        expect(rows.rows).toHaveLength(2);
+        expect(rows.rows.every((r) => r.title.startsWith('User1'))).toBe(true);
+      } finally {
+        client.release();
+      }
+    });
+
+    test('session.get boolean type filters correctly', async () => {
+      await adminClient.query(
+        `ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE;`
+      );
+      try {
+        await adminClient.query(
+          `UPDATE posts SET is_featured = TRUE WHERE id = $1;`,
+          [testData.posts.user1Published]
+        );
+
+        const p = policy('posts_featured')
+          .on('posts')
+          .for('SELECT')
+          .when(
+            column('is_featured').eq(
+              session.get('app.show_featured', 'boolean')
+            )
+          );
+        await adminClient.query(p.toSQL());
+
+        const client = await pool.connect();
+        try {
+          await client.query('SET ROLE authenticated;');
+          await setCurrentUser(client, testData.users.user1);
+          await client.query(`SET app.show_featured = 'true';`);
+          const rows = await client.query('SELECT id, title FROM posts;');
+          expect(rows.rows).toHaveLength(1);
+          expect(rows.rows[0].title).toBe('User1 Published');
+        } finally {
+          client.release();
+        }
+      } finally {
+        await adminClient.query(
+          `ALTER TABLE posts DROP COLUMN IF EXISTS is_featured CASCADE;`
+        );
+      }
+    });
+  });
+
+  describe('Policy Templates', () => {
+    test('policies.userOwned SELECT template', async () => {
+      const [p] = policies.userOwned('documents', 'SELECT');
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        const rows = await client.query(
+          'SELECT id, title FROM documents ORDER BY title;'
+        );
+        expect(rows.rows).toHaveLength(2);
+        expect(rows.rows.every((r) => r.title.startsWith('User1'))).toBe(true);
+      } finally {
+        client.release();
+      }
+    });
+
+    test('policies.userOwned INSERT template', async () => {
+      const [p] = policies.userOwned('documents', 'INSERT');
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+
+        await client.query(
+          `INSERT INTO documents (title, content, user_id) VALUES ('Own', 'c', $1);`,
+          [testData.users.user1]
+        );
+
+        await expect(
+          client.query(
+            `INSERT INTO documents (title, content, user_id) VALUES ('Other', 'c', $1);`,
+            [testData.users.user2]
+          )
+        ).rejects.toThrow();
+      } finally {
+        client.release();
+      }
+    });
+
+    test('policies.roleAccess grants access to role holders', async () => {
+      const [p] = policies.roleAccess('documents', 'admin', 'SELECT');
+      await adminClient.query(p.toSQL());
+
+      const adminC = await pool.connect();
+      try {
+        await adminC.query('SET ROLE authenticated;');
+        await setCurrentUser(adminC, testData.users.admin);
+        const r = await adminC.query('SELECT id FROM documents;');
+        expect(r.rows).toHaveLength(4);
+      } finally {
+        adminC.release();
+      }
+
+      const userC = await pool.connect();
+      try {
+        await userC.query('SET ROLE authenticated;');
+        await setCurrentUser(userC, testData.users.user1);
+        const r = await userC.query('SELECT id FROM documents;');
+        expect(r.rows).toHaveLength(0);
+      } finally {
+        userC.release();
+      }
+    });
+  });
+
+  describe('Policy Operation Aliases', () => {
+    test('.read() alias works', async () => {
+      const p = policy('docs_read_alias')
+        .on('documents')
+        .read()
+        .when(column('user_id').isOwner());
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        const r = await client.query('SELECT id FROM documents;');
+        expect(r.rows).toHaveLength(2);
+      } finally {
+        client.release();
+      }
+    });
+
+    test('.write() alias works', async () => {
+      const p = policy('docs_write_alias')
+        .on('documents')
+        .write()
+        .withCheck(column('user_id').isOwner());
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        await client.query(
+          `INSERT INTO documents (title, content, user_id) VALUES ('Own', 'c', $1);`,
+          [testData.users.user1]
+        );
+        await expect(
+          client.query(
+            `INSERT INTO documents (title, content, user_id) VALUES ('Other', 'c', $1);`,
+            [testData.users.user2]
+          )
+        ).rejects.toThrow();
+      } finally {
+        client.release();
+      }
+    });
+
+    test('.all() alias with allow()', async () => {
+      const p = policy('docs_all_alias')
+        .on('documents')
+        .all()
+        .allow(column('user_id').isOwner());
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        const r = await client.query('SELECT id FROM documents;');
+        expect(r.rows).toHaveLength(2);
+        await client.query(
+          `INSERT INTO documents (title, content, user_id) VALUES ('Own2', 'c', $1);`,
+          [testData.users.user1]
+        );
+      } finally {
+        client.release();
+      }
+    });
+  });
+
+  describe('hasRole with custom table', () => {
+    test('hasRole with custom roles table', async () => {
+      await adminClient.query(`
+        CREATE TABLE IF NOT EXISTS custom_roles (
+          user_id UUID NOT NULL,
+          role TEXT NOT NULL,
+          PRIMARY KEY (user_id, role)
+        );
+        GRANT SELECT ON custom_roles TO authenticated;
+      `);
+      try {
+        await adminClient.query(
+          `INSERT INTO custom_roles (user_id, role) VALUES ($1, 'superadmin');`,
+          [testData.users.admin]
+        );
+
+        const p = policy('docs_superadmin')
+          .on('documents')
+          .for('SELECT')
+          .when(hasRole('superadmin', 'custom_roles').and(alwaysTrue()));
+        await adminClient.query(p.toSQL());
+
+        const adminC = await pool.connect();
+        try {
+          await adminC.query('SET ROLE authenticated;');
+          await setCurrentUser(adminC, testData.users.admin);
+          const r = await adminC.query('SELECT id FROM documents;');
+          expect(r.rows).toHaveLength(4);
+        } finally {
+          adminC.release();
+        }
+      } finally {
+        await adminClient.query('DROP TABLE IF EXISTS custom_roles CASCADE;');
+      }
+    });
+  });
+
+  describe('Left Join Subqueries', () => {
+    test('LEFT JOIN in subquery works', async () => {
+      const orgId = uuidv4();
+      await adminClient.query(
+        `INSERT INTO organizations (id, name) VALUES ($1, 'Join Org');`,
+        [orgId]
+      );
+      await adminClient.query(
+        `INSERT INTO organization_members (organization_id, user_id) VALUES ($1, $2);`,
+        [orgId, testData.users.user1]
+      );
+      await adminClient.query(
+        `ALTER TABLE documents ADD COLUMN IF NOT EXISTS organization_id UUID;`
+      );
+      try {
+        await adminClient.query(
+          `UPDATE documents SET organization_id = $1 WHERE id = $2;`,
+          [orgId, testData.documents.user1Private]
+        );
+
+        const membersPolicy = policy('om_select')
+          .on('organization_members')
+          .for('SELECT')
+          .when(alwaysTrue());
+        await adminClient.query(membersPolicy.toSQL());
+
+        const orgsPolicy = policy('orgs_select')
+          .on('organizations')
+          .for('SELECT')
+          .when(alwaysTrue());
+        await adminClient.query(orgsPolicy.toSQL());
+
+        const p = policy('docs_left_join')
+          .on('documents')
+          .for('SELECT')
+          .when(
+            column('organization_id').in(
+              from('organizations', 'org')
+                .select('id')
+                .join(
+                  'organization_members',
+                  column('org.id').eq(sql('om.organization_id')),
+                  'left',
+                  'om'
+                )
+                .where(column('om.user_id').eq(auth.uid()))
+            )
+          );
+        await adminClient.query(p.toSQL());
+
+        const client = await pool.connect();
+        try {
+          await client.query('SET ROLE authenticated;');
+          await setCurrentUser(client, testData.users.user1);
+          const r = await client.query(
+            'SELECT id, title FROM documents WHERE organization_id IS NOT NULL;'
+          );
+          expect(r.rows).toHaveLength(1);
+          expect(r.rows[0].title).toBe('User1 Private Doc');
+        } finally {
+          client.release();
+        }
+      } finally {
+        await adminClient.query(
+          `ALTER TABLE documents DROP COLUMN IF EXISTS organization_id CASCADE;`
+        );
+      }
+    });
+  });
+
+  describe('sql() raw expressions', () => {
+    test('sql() raw expression in policy condition', async () => {
+      const p = policy('docs_raw_sql')
+        .on('documents')
+        .for('SELECT')
+        .when(column('user_id').eq(sql('auth.uid()')));
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        const r = await client.query(
+          'SELECT id, title FROM documents ORDER BY title;'
+        );
+        expect(r.rows).toHaveLength(2);
+        expect(r.rows.every((row) => row.title.startsWith('User1'))).toBe(true);
+      } finally {
+        client.release();
+      }
+    });
+  });
+
+  describe('Typed API', () => {
+    test('createRowguard typed policy works end-to-end', async () => {
+      type DB = {
+        public: {
+          Tables: {
+            documents: {
+              Row: {
+                id: string;
+                user_id: string;
+                title: string;
+                content: string | null;
+                is_public: boolean;
+                tenant_id: number | null;
+                created_at: string;
+              };
+              Insert: Record<string, unknown>;
+              Update: Record<string, unknown>;
+            };
+          };
+        };
+      };
+      const rg = createRowguard<DB>();
+
+      const p = rg
+        .policy('typed_docs')
+        .on('documents')
+        .read()
+        .when(rg.column('documents', 'user_id').eq(rg.auth.uid()));
+
+      await adminClient.query(p.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        const r = await client.query(
+          'SELECT id, title FROM documents ORDER BY title;'
+        );
+        expect(r.rows).toHaveLength(2);
+        expect(r.rows.every((row) => row.title.startsWith('User1'))).toBe(true);
+      } finally {
+        client.release();
+      }
+    });
+  });
+
+  describe('Usability helpers', () => {
+    test('crud() applies ownership policies for all four operations', async () => {
+      await applyPolicyGroup(crud('documents'), adminClient);
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+
+        // SELECT: own docs only
+        const rows = await client.query('SELECT title FROM documents ORDER BY title;');
+        expect(rows.rows.map((r: { title: string }) => r.title)).toEqual([
+          'User1 Private Doc',
+          'User1 Public Doc',
+        ]);
+
+        // INSERT own — allowed
+        await client.query(
+          `INSERT INTO documents (title, user_id) VALUES ('Mine', $1)`,
+          [testData.users.user1]
+        );
+
+        // INSERT as other — rejected
+        await expect(
+          client.query(`INSERT INTO documents (title, user_id) VALUES ('Hack', $1)`, [testData.users.user2])
+        ).rejects.toThrow();
+
+        // UPDATE own — silently applies; other's — 0 rows affected
+        await client.query(`UPDATE documents SET title = 'Updated' WHERE id = $1`, [testData.documents.user1Private]);
+        const upd = await client.query(`UPDATE documents SET title = 'X' WHERE id = $1`, [testData.documents.user2Private]);
+        expect(upd.rowCount).toBe(0);
+
+        // DELETE own — ok; other's — 0 rows
+        await client.query(`DELETE FROM documents WHERE id = $1`, [testData.documents.user1Public]);
+        const del = await client.query(`DELETE FROM documents WHERE id = $1`, [testData.documents.user2Private]);
+        expect(del.rowCount).toBe(0);
+      } finally {
+        client.release();
+      }
+    });
+
+    test('tenantGroup() alone shows no rows — RESTRICTIVE needs a companion PERMISSIVE', async () => {
+      // tenantGroup emits only the RESTRICTIVE policy.
+      // Without any PERMISSIVE policy, Postgres denies everything.
+      await applyPolicyGroup(tenantGroup('documents'), adminClient);
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        await setTenant(client, 1);
+
+        const rows = await client.query('SELECT id FROM documents;');
+        expect(rows.rows).toHaveLength(0);
+      } finally {
+        client.release();
+      }
+    });
+
+    test('tenantGroup() + crud() together: users see only their own rows in their tenant', async () => {
+      await applyPolicyGroup(tenantGroup('documents'), adminClient);
+      await applyPolicyGroup(crud('documents'), adminClient);
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        await setTenant(client, 1);
+
+        // user1 owns doc1 + doc2 (both tenant 1) — visible
+        // user2's docs are tenant 1 (doc3) and tenant 2 (doc4) — neither visible to user1
+        const rows = await client.query('SELECT title FROM documents ORDER BY title;');
+        expect(rows.rows.map((r: { title: string }) => r.title)).toEqual([
+          'User1 Private Doc',
+          'User1 Public Doc',
+        ]);
+      } finally {
+        client.release();
+      }
+    });
+
+    test('applyPolicyGroup() rolls back entirely on error', async () => {
+      // Second policy references a non-existent table — whole group should roll back
+      const group = createPolicyGroup('bad_group', [
+        policy('docs_ok').on('documents').for('SELECT').when(column('user_id').isOwner()),
+        policy('bad').on('nonexistent_table').for('SELECT').when(alwaysTrue()),
+      ]);
+
+      await expect(applyPolicyGroup(group, adminClient)).rejects.toThrow();
+
+      // docs_ok must NOT exist since the transaction rolled back
+      const result = await adminClient.query(
+        `SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND policyname = 'docs_ok'`
+      );
+      expect(result.rows).toHaveLength(0);
+    });
+
+    test('applyPolicyGroup() with includeIndexes creates indexes atomically', async () => {
+      await applyPolicyGroup(crud('documents'), adminClient, { includeIndexes: true });
+
+      const idxResult = await adminClient.query(`
+        SELECT indexname FROM pg_indexes
+        WHERE schemaname = 'public' AND tablename = 'documents'
+        AND indexname = 'idx_documents_user_id';
+      `);
+      expect(idxResult.rows).toHaveLength(1);
+    });
+
+    test('PolicyBuilder.validate() succeeds for a valid policy', async () => {
+      const p = policy('valid_p').on('documents').for('SELECT').when(column('user_id').isOwner());
+      await expect(p.validate(adminClient)).resolves.not.toThrow();
+
+      // validate must NOT have left the policy behind
+      const result = await adminClient.query(
+        `SELECT policyname FROM pg_policies WHERE schemaname = 'public' AND policyname = 'valid_p'`
+      );
+      expect(result.rows).toHaveLength(0);
+    });
+
+    test('PolicyBuilder.validate() rejects a policy on a non-existent table', async () => {
+      const p = policy('bad_p').on('does_not_exist').for('SELECT').when(alwaysTrue());
+      await expect(p.validate(adminClient)).rejects.toThrow();
+    });
+
+    test('policyGroupToSQL warns when RESTRICTIVE has no companion PERMISSIVE', () => {
+      const group = createPolicyGroup('isolated', [
+        policy('t_isolation').on('documents').for('ALL').restrictive()
+          .when(column('tenant_id').belongsToTenant()),
+      ]);
+      const sql = policyGroupToSQL(group);
+      expect(sql).toContain('Warning:');
+      expect(sql).toContain('RESTRICTIVE');
+      expect(sql).toContain('PERMISSIVE');
+    });
+
+    test('policyGroupToSQL does NOT warn when RESTRICTIVE has a companion PERMISSIVE', () => {
+      const group = createPolicyGroup('paired', [
+        policy('t_isolation').on('documents').for('ALL').restrictive()
+          .when(column('tenant_id').belongsToTenant()),
+        policy('t_base').on('documents').for('ALL')
+          .when(column('tenant_id').belongsToTenant()),
+      ]);
+      const sql = policyGroupToSQL(group);
+      expect(sql).not.toContain('Warning:');
+    });
+
+    test('policyGroupToSQL hints when membership subquery table has no SELECT policy', () => {
+      const group = createPolicyGroup('member_access', [
+        policy('proj_access').on('projects').for('SELECT')
+          .when(column('id').isMemberOf('project_members', 'project_id', 'id')),
+      ]);
+      const sql = policyGroupToSQL(group);
+      expect(sql).toContain('project_members');
+      expect(sql).toContain('SELECT policy');
+    });
+
+    test('policyGroupToSQL does NOT hint when join table has its own SELECT policy in the group', () => {
+      const group = createPolicyGroup('member_access_complete', [
+        policy('pm_select').on('project_members').for('SELECT').when(alwaysTrue()),
+        policy('proj_access').on('projects').for('SELECT')
+          .when(column('id').isMemberOf('project_members', 'project_id', 'id')),
+      ]);
+      const sql = policyGroupToSQL(group);
+      expect(sql).not.toContain('Note:');
+    });
+  });
+
+  describe('Complex Scenarios', () => {
+    // Scenario 1: RESTRICTIVE tenant isolation + PERMISSIVE ownership + PERMISSIVE public
+    // Users see only rows in their tenant that are either theirs or public.
+    // Cross-tenant public rows must NOT be visible even though is_public = true.
+    test('tenant isolation restricts even public rows from other tenants', async () => {
+      // doc1: user1, tenant 1, private
+      // doc2: user1, tenant 1, public
+      // doc3: user2, tenant 1, private
+      // doc4: user2, tenant 2, public  ← must NOT be visible to tenant-1 users
+      const restrictive = policies.tenantIsolation('documents');
+      const ownership = policy('docs_own').on('documents').for('SELECT').when(column('user_id').isOwner());
+      const publicAccess = policies.publicAccess('documents');
+
+      await adminClient.query(restrictive.toSQL());
+      await adminClient.query(ownership.toSQL());
+      await adminClient.query(publicAccess.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        await setTenant(client, 1);
+
+        const rows = await client.query('SELECT title FROM documents ORDER BY title;');
+        const titles = rows.rows.map((r: { title: string }) => r.title);
+        // Only own docs pass (ownership PERMISSIVE + RESTRICTIVE tenant=1)
+        expect(titles).toContain('User1 Private Doc');
+        expect(titles).toContain('User1 Public Doc');
+        // doc3: tenant 1, private, user2 — passes RESTRICTIVE but no PERMISSIVE
+        expect(titles).not.toContain('User2 Private Doc');
+        // doc4: tenant 2, public — blocked by RESTRICTIVE even though is_public=true
+        expect(titles).not.toContain('User2 Public Doc');
+        expect(rows.rows).toHaveLength(2);
+      } finally {
+        client.release();
+      }
+    });
+
+    // Scenario 2: Admin role overrides user ownership via multiple permissive policies
+    test('admin role policy and user ownership policy stack as permissive', async () => {
+      // Need SELECT on user_roles for hasRole subquery
+      await adminClient.query(
+        policy('ur_select').on('user_roles').for('SELECT').when(alwaysTrue()).toSQL()
+      );
+      await adminClient.query(
+        policy('docs_admin').on('documents').for('SELECT').when(hasRole('admin')).toSQL()
+      );
+      await adminClient.query(
+        policy('docs_own').on('documents').for('SELECT').when(column('user_id').isOwner()).toSQL()
+      );
+
+      // Admin sees all 4 documents
+      const adminConn = await pool.connect();
+      try {
+        await adminConn.query('SET ROLE authenticated;');
+        await setCurrentUser(adminConn, testData.users.admin);
+        const all = await adminConn.query('SELECT id FROM documents;');
+        expect(all.rows).toHaveLength(4);
+      } finally {
+        adminConn.release();
+      }
+
+      // user1 sees only their 2
+      const user1Conn = await pool.connect();
+      try {
+        await user1Conn.query('SET ROLE authenticated;');
+        await setCurrentUser(user1Conn, testData.users.user1);
+        const own = await user1Conn.query('SELECT title FROM documents ORDER BY title;');
+        expect(own.rows).toHaveLength(2);
+        expect(own.rows.map((r: { title: string }) => r.title)).toEqual([
+          'User1 Private Doc',
+          'User1 Public Doc',
+        ]);
+      } finally {
+        user1Conn.release();
+      }
+    });
+
+    // Scenario 3: Full CRUD policy group — read allows own+public, write enforces ownership
+    test('CRUD policy group enforces different conditions per operation', async () => {
+      const group = createPolicyGroup('documents_full_crud', [
+        policy('docs_select').on('documents').for('SELECT')
+          .when(column('user_id').isOwner().or(column('is_public').isPublic())),
+        policy('docs_insert').on('documents').for('INSERT')
+          .withCheck(column('user_id').isOwner()),
+        policy('docs_update').on('documents').for('UPDATE')
+          .when(column('user_id').isOwner())
+          .withCheck(column('user_id').isOwner()),
+        policy('docs_delete').on('documents').for('DELETE')
+          .when(column('user_id').isOwner()),
+      ]);
+
+      const statements = policyGroupToSQL(group).split(';').map((s: string) => s.trim()).filter(Boolean);
+      for (const stmt of statements) await adminClient.query(stmt + ';');
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+
+        // SELECT: own + user2's public doc
+        const rows = await client.query('SELECT title FROM documents ORDER BY title;');
+        expect(rows.rows).toHaveLength(3);
+
+        // INSERT own doc — allowed
+        await client.query(
+          `INSERT INTO documents (title, user_id) VALUES ('New Doc', $1)`,
+          [testData.users.user1]
+        );
+
+        // INSERT as other user — blocked
+        await expect(
+          client.query(`INSERT INTO documents (title, user_id) VALUES ('Hack', $1)`, [testData.users.user2])
+        ).rejects.toThrow();
+
+        // UPDATE own doc — allowed
+        await client.query(
+          `UPDATE documents SET title = 'Updated' WHERE id = $1`,
+          [testData.documents.user1Private]
+        );
+
+        // UPDATE other's doc — silently 0 rows (RLS filters it from USING)
+        const upd = await client.query(
+          `UPDATE documents SET title = 'Hacked' WHERE id = $1`,
+          [testData.documents.user2Private]
+        );
+        expect(upd.rowCount).toBe(0);
+
+        // DELETE own doc — allowed
+        await client.query(`DELETE FROM documents WHERE id = $1`, [testData.documents.user1Public]);
+
+        // DELETE other's doc — silently 0 rows
+        const del = await client.query(
+          `DELETE FROM documents WHERE id = $1`,
+          [testData.documents.user2Private]
+        );
+        expect(del.rowCount).toBe(0);
+      } finally {
+        client.release();
+      }
+    });
+
+    // Scenario 4: Membership + ownership OR, combined with project_members subquery
+    test('membership subquery OR ownership gives correct cross-user project visibility', async () => {
+      // project1 created by user1; user2 is a member
+      // project2 created by user2; user1 is a member
+      // Both users should see both projects
+      await adminClient.query(
+        policy('pm_select').on('project_members').for('SELECT').when(alwaysTrue()).toSQL()
+      );
+      await adminClient.query(
+        policy('proj_access').on('projects').for('SELECT')
+          .when(
+            column('created_by').isOwner()
+              .or(column('id').isMemberOf('project_members', 'project_id', 'id'))
+          )
+          .toSQL()
+      );
+
+      for (const userId of [testData.users.user1, testData.users.user2]) {
+        const client = await pool.connect();
+        try {
+          await client.query('SET ROLE authenticated;');
+          await setCurrentUser(client, userId);
+          const rows = await client.query('SELECT name FROM projects ORDER BY name;');
+          expect(rows.rows).toHaveLength(2);
+        } finally {
+          client.release();
+        }
+      }
+    });
+
+    // Scenario 5: Soft-delete + ownership — deleted rows are invisible to owners
+    test('soft delete combined with ownership hides deleted rows', async () => {
+      await adminClient.query(
+        `ALTER TABLE documents ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;`
+      );
+      // soft-delete user1's private doc
+      await adminClient.query(
+        `UPDATE documents SET deleted_at = NOW() WHERE id = $1`,
+        [testData.documents.user1Private]
+      );
+
+      await adminClient.query(
+        policy('docs_live').on('documents').for('SELECT')
+          .when(column('user_id').isOwner().and(column('deleted_at').isNull()))
+          .toSQL()
+      );
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        const rows = await client.query('SELECT title FROM documents;');
+        // user1 has 2 docs but 1 is soft-deleted — only public doc visible
+        expect(rows.rows).toHaveLength(1);
+        expect(rows.rows[0].title).toBe('User1 Public Doc');
+      } finally {
+        client.release();
+        await adminClient.query(`DROP POLICY IF EXISTS docs_live ON documents;`);
+        await adminClient.query(`ALTER TABLE documents DROP COLUMN IF EXISTS deleted_at;`);
+      }
+    });
+
+    // Scenario 6: Three-level OR — hasRole admin | owner | public
+    test('three-way OR: admin sees all, owners see own, everyone sees public', async () => {
+      await adminClient.query(
+        policy('ur_select').on('user_roles').for('SELECT').when(alwaysTrue()).toSQL()
+      );
+      await adminClient.query(
+        policy('docs_access').on('documents').for('SELECT')
+          .when(
+            hasRole('admin')
+              .or(column('user_id').isOwner())
+              .or(column('is_public').isPublic())
+          )
+          .toSQL()
+      );
+
+      // admin: all 4
+      const adminConn = await pool.connect();
+      try {
+        await adminConn.query('SET ROLE authenticated;');
+        await setCurrentUser(adminConn, testData.users.admin);
+        expect((await adminConn.query('SELECT id FROM documents;')).rows).toHaveLength(4);
+      } finally { adminConn.release(); }
+
+      // user1: own 2 + user2's public = 3
+      const user1Conn = await pool.connect();
+      try {
+        await user1Conn.query('SET ROLE authenticated;');
+        await setCurrentUser(user1Conn, testData.users.user1);
+        expect((await user1Conn.query('SELECT id FROM documents;')).rows).toHaveLength(3);
+      } finally { user1Conn.release(); }
+
+      // user2: own 2 + user1's public = 3
+      const user2Conn = await pool.connect();
+      try {
+        await user2Conn.query('SET ROLE authenticated;');
+        await setCurrentUser(user2Conn, testData.users.user2);
+        expect((await user2Conn.query('SELECT id FROM documents;')).rows).toHaveLength(3);
+      } finally { user2Conn.release(); }
+    });
+
+    // Scenario 7: Tenant isolation + membership — users only see org data within their tenant
+    test('tenant isolation + org membership: cross-tenant org rows are blocked', async () => {
+      await adminClient.query(
+        `ALTER TABLE documents ADD COLUMN IF NOT EXISTS organization_id UUID;`
+      );
+
+      // Create two orgs
+      const org1Id = uuidv4();
+      const org2Id = uuidv4();
+      await adminClient.query(
+        `INSERT INTO organizations (id, name) VALUES ($1, 'Org 1'), ($2, 'Org 2')`,
+        [org1Id, org2Id]
+      );
+      // user1 is member of org1 only
+      await adminClient.query(
+        `INSERT INTO organization_members (organization_id, user_id) VALUES ($1, $2)`,
+        [org1Id, testData.users.user1]
+      );
+      // Assign docs to orgs: user1Private → org1, user2Private → org2
+      await adminClient.query(
+        `UPDATE documents SET organization_id = $1 WHERE id = $2`,
+        [org1Id, testData.documents.user1Private]
+      );
+      await adminClient.query(
+        `UPDATE documents SET organization_id = $1 WHERE id = $2`,
+        [org2Id, testData.documents.user2Private]
+      );
+
+      await adminClient.query(
+        policy('om_select').on('organization_members').for('SELECT').when(alwaysTrue()).toSQL()
+      );
+      const restrictive = policies.tenantIsolation('documents');
+      const orgAccess = policy('docs_org').on('documents').for('SELECT')
+        .when(
+          column('organization_id').in(
+            from('organization_members')
+              .select('organization_id')
+              .where(column('user_id').eq(auth.uid()))
+          )
+        );
+
+      await adminClient.query(restrictive.toSQL());
+      await adminClient.query(orgAccess.toSQL());
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        await setTenant(client, 1);
+
+        const rows = await client.query('SELECT id FROM documents;');
+        // Only user1Private is in org1 AND tenant 1
+        expect(rows.rows).toHaveLength(1);
+        expect(rows.rows[0].id).toBe(testData.documents.user1Private);
+      } finally {
+        client.release();
+        await adminClient.query(
+          `DELETE FROM organization_members WHERE organization_id IN ($1, $2)`,
+          [org1Id, org2Id]
+        );
+        await adminClient.query(
+          `DELETE FROM organizations WHERE id IN ($1, $2)`,
+          [org1Id, org2Id]
+        );
+        await adminClient.query(`DROP POLICY IF EXISTS docs_org ON documents;`);
+        await adminClient.query(`DROP POLICY IF EXISTS tenant_data_tenant_isolation ON documents;`);
+        await adminClient.query(`ALTER TABLE documents DROP COLUMN IF EXISTS organization_id;`);
+      }
+    });
+
+    // Scenario 8: policyGroupToSQL + includeIndexes — indexes are created and policies work
+    test('policyGroupToSQL with includeIndexes creates indexes and policies work correctly', async () => {
+      const group = createPolicyGroup('indexed_docs', [
+        policy('docs_sel').on('documents').for('SELECT')
+          .when(column('user_id').isOwner().or(column('is_public').isPublic())),
+        policy('docs_ins').on('documents').for('INSERT')
+          .withCheck(column('user_id').isOwner()),
+      ]);
+
+      const statements = policyGroupToSQL(group, { includeIndexes: true })
+        .split(';').map((s: string) => s.trim()).filter(Boolean);
+      for (const stmt of statements) await adminClient.query(stmt + ';');
+
+      // Only user_id gets indexed — is_public = TRUE uses a static value so
+      // the index analyser correctly skips it (no dynamic lookup to accelerate)
+      const idxResult = await adminClient.query(`
+        SELECT indexname FROM pg_indexes
+        WHERE schemaname = 'public' AND tablename = 'documents'
+        AND indexname = 'idx_documents_user_id';
+      `);
+      expect(idxResult.rows).toHaveLength(1);
+
+      // Verify policy works
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        const rows = await client.query('SELECT id FROM documents;');
+        expect(rows.rows).toHaveLength(3); // 2 own + 1 user2 public
+      } finally {
+        client.release();
+      }
+    });
+
+    // Scenario 9: session variable type + ownership AND — restricts to org AND owner
+    test('session uuid variable AND ownership prevents cross-user access within org', async () => {
+      // Policy: user_id = auth.uid() AND user_id = session var (redundant but tests both together)
+      // More realistic: documents must belong to the session org_id AND be owned by user
+      await adminClient.query(
+        `ALTER TABLE documents ADD COLUMN IF NOT EXISTS owner_org_id UUID;`
+      );
+      const orgId = uuidv4();
+      // Set user1's docs to orgId
+      await adminClient.query(
+        `UPDATE documents SET owner_org_id = $1 WHERE user_id = $2`,
+        [orgId, testData.users.user1]
+      );
+
+      await adminClient.query(
+        policy('docs_org_own').on('documents').for('SELECT')
+          .when(
+            column('user_id').isOwner()
+              .and(column('owner_org_id').eq(session.get('app.current_org_id', 'uuid')))
+          )
+          .toSQL()
+      );
+
+      const client = await pool.connect();
+      try {
+        await client.query('SET ROLE authenticated;');
+        await setCurrentUser(client, testData.users.user1);
+        await client.query(`SET app.current_org_id = ${escapeLiteral(orgId)};`);
+
+        const rows = await client.query('SELECT id FROM documents;');
+        expect(rows.rows).toHaveLength(2); // only user1's docs with orgId set
+
+        // Wrong org — sees nothing
+        await client.query(`SET app.current_org_id = ${escapeLiteral(uuidv4())};`);
+        const empty = await client.query('SELECT id FROM documents;');
+        expect(empty.rows).toHaveLength(0);
+      } finally {
+        client.release();
+        await adminClient.query(`DROP POLICY IF EXISTS docs_org_own ON documents;`);
+        await adminClient.query(`ALTER TABLE documents DROP COLUMN IF EXISTS owner_org_id;`);
+      }
+    });
+
+    // Scenario 10: Pattern match + role bypass — admins bypass LIKE filter
+    test('LIKE filter with admin role bypass via OR', async () => {
+      await adminClient.query(
+        policy('ur_select').on('user_roles').for('SELECT').when(alwaysTrue()).toSQL()
+      );
+      // Users see only docs whose title matches their name, OR admin sees all
+      await adminClient.query(
+        policy('docs_pattern_or_admin').on('documents').for('SELECT')
+          .when(
+            hasRole('admin').or(column('title').like('User1%'))
+          )
+          .toSQL()
+      );
+
+      // Admin sees all 4
+      const adminConn = await pool.connect();
+      try {
+        await adminConn.query('SET ROLE authenticated;');
+        await setCurrentUser(adminConn, testData.users.admin);
+        expect((await adminConn.query('SELECT id FROM documents;')).rows).toHaveLength(4);
+      } finally { adminConn.release(); }
+
+      // user1 sees only 'User1%' titles (2 docs), regardless of ownership
+      const user1Conn = await pool.connect();
+      try {
+        await user1Conn.query('SET ROLE authenticated;');
+        await setCurrentUser(user1Conn, testData.users.user1);
+        const rows = await user1Conn.query('SELECT title FROM documents ORDER BY title;');
+        expect(rows.rows).toHaveLength(2);
+        expect(rows.rows.every((r: { title: string }) => r.title.startsWith('User1'))).toBe(true);
+      } finally { user1Conn.release(); }
     });
   });
 });

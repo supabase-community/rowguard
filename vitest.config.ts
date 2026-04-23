@@ -6,8 +6,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    testTimeout: 2000,
-    hookTimeout: 5000,
+    testTimeout: isIntegration ? 30_000 : 2_000,
+    hookTimeout: isIntegration ? 120_000 : 5_000,
     exclude: ['**/node_modules/**', '**/dist/**'],
     include: isIntegration
       ? ['tests/integration.test.ts']
