@@ -266,79 +266,22 @@ export default function PolicyTester({
 
   if (!isConnected) {
     return (
-      <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border p-6">
-        <h2 className="font-semibold text-text-primary mb-4 flex items-center gap-2">
-          <Play size={20} />
-          Policy Tester
-        </h2>
-        <div className="text-sm text-text-tertiary py-8">
-          <AlertCircle
-            size={48}
-            className="mx-auto mb-4 opacity-50 text-yellow-400"
-          />
-          <div className="text-center mb-4">
-            <p className="font-semibold text-text-primary">
-              Database Connection Required
-            </p>
-            <p className="text-xs mt-1">
-              Policy testing features require a local Supabase instance
-            </p>
-          </div>
-
-          <div className="bg-blue-950/30 border border-blue-800/50 rounded-lg p-4 text-left">
-            <p className="text-sm text-blue-300 font-semibold mb-2">
-              💡 This deployed version is SQL-generation only
-            </p>
-            <p className="text-xs text-blue-200 mb-3">
-              The migration workflow, schema viewer, and policy testing features
-              only work when running locally with Supabase.
-            </p>
-            <div className="text-xs text-blue-200 space-y-2">
-              <p className="font-semibold">To enable full features:</p>
-              <ol className="list-decimal ml-4 space-y-1">
-                <li>
-                  Clone:{' '}
-                  <code className="px-1 py-0.5 bg-blue-900/50 rounded font-mono">
-                    git clone https://github.com/supabase-community/rowguard.git
-                  </code>
-                </li>
-                <li>
-                  Install:{' '}
-                  <code className="px-1 py-0.5 bg-blue-900/50 rounded font-mono">
-                    pnpm install
-                  </code>
-                </li>
-                <li>
-                  Run:{' '}
-                  <code className="px-1 py-0.5 bg-blue-900/50 rounded font-mono">
-                    pnpm demo:dev:full
-                  </code>
-                </li>
-              </ol>
-              <p className="mt-3 pt-3 border-t border-blue-800/50">
-                See{' '}
-                <a
-                  href="https://github.com/supabase-community/rowguard/tree/main/demo"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-supabase-lime hover:underline"
-                >
-                  demo/README.md
-                </a>{' '}
-                for detailed setup instructions.
-              </p>
-            </div>
-          </div>
+      <div className="p-5">
+        <p className="text-sm font-medium text-text-primary mb-1">Live testing requires a local database</p>
+        <p className="text-sm text-text-secondary mb-4">Run locally to connect Supabase and test policies against real data.</p>
+        <div className="bg-dark-surface-2 border border-dark-border rounded-md p-4 text-xs font-mono space-y-1.5">
+          <div className="text-text-tertiary">git clone https://github.com/supabase-community/rowguard.git</div>
+          <div className="text-text-tertiary">pnpm install</div>
+          <div className="text-supabase-lime">pnpm demo:dev:full</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border overflow-hidden">
-      <div className="bg-slate-800 text-white px-6 py-4 flex items-center gap-2">
-        <Terminal size={20} />
-        <h2 className="font-semibold">Migration-Based Testing</h2>
+    <div className="overflow-hidden">
+      <div className="px-6 py-3 flex items-center gap-2 border-b border-dark-border">
+        <Terminal size={16} className="text-text-tertiary" />
         {currentUser && (
           <span className="ml-auto text-xs bg-blue-950/50 text-blue-400 px-2 py-1 rounded-full flex items-center gap-1">
             <User size={12} />
@@ -347,260 +290,118 @@ export default function PolicyTester({
         )}
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Step 1: Save as Migration */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 text-sm font-bold">
-              1
-            </span>
-            <label className="text-sm font-medium text-text-primary">
-              Save Policy as Migration File
-            </label>
-          </div>
+      <div className="p-5 space-y-5">
 
+        {/* Step 1 */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">01 — Save</p>
           <button
             onClick={saveMigration}
             disabled={!generatedSQL || saveStatus === 'saving'}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-supabase-lime hover:bg-supabase-lime-hover text-dark-bg rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-supabase-lime hover:bg-supabase-lime-hover text-dark-bg rounded-md transition-all duration-150 text-sm font-semibold active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saveStatus === 'saving' ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Saving Migration...
-              </>
+              <><Loader2 size={14} className="animate-spin" />Saving…</>
             ) : saveStatus === 'success' ? (
-              <>
-                <CheckCircle2 size={16} />
-                Migration Saved!
-              </>
+              <><CheckCircle2 size={14} />Saved</>
             ) : (
-              <>
-                <Save size={16} />
-                Save as Migration
-              </>
+              <><Save size={14} />Save as migration</>
             )}
           </button>
-
           {saveError && (
-            <div className="flex items-start gap-2 p-3 bg-red-950/50 border border-red-800 rounded-lg text-sm">
-              <AlertCircle
-                size={16}
-                className="text-red-400 flex-shrink-0 mt-0.5"
-              />
-              <div className="text-red-400">
-                <p className="font-semibold">Error</p>
-                <p className="text-xs font-mono mt-1">{saveError}</p>
-              </div>
-            </div>
+            <p className="text-xs text-red-400 font-mono pl-1">{saveError}</p>
           )}
-
-          {/* Active Migrations List */}
           {migrations.length > 0 && (
-            <div className="p-3 bg-dark-surface-2 border border-dark-border rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-text-secondary">
-                  Active Policy Migrations ({migrations.length})
-                </span>
-                <button
-                  onClick={loadMigrations}
-                  disabled={loadingMigrations}
-                  className="text-xs text-supabase-lime hover:text-supabase-lime-hover"
-                >
-                  <RefreshCw
-                    size={12}
-                    className={loadingMigrations ? 'animate-spin' : ''}
-                  />
+            <div className="space-y-1 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-text-tertiary">Pending ({migrations.length})</span>
+                <button onClick={loadMigrations} disabled={loadingMigrations} className="text-text-tertiary hover:text-text-secondary transition-colors">
+                  <RefreshCw size={11} className={loadingMigrations ? 'animate-spin' : ''} />
                 </button>
               </div>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {migrations.map((filename) => (
-                  <div
-                    key={filename}
-                    className="flex items-center justify-between text-xs font-mono text-text-tertiary bg-dark-bg px-2 py-1.5 rounded"
-                  >
-                    <span className="truncate flex-1">{filename}</span>
-                    <button
-                      onClick={() => removeMigration(filename)}
-                      className="ml-2 text-red-400 hover:text-red-300 flex-shrink-0"
-                      title="Remove migration"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              {migrations.map((filename) => (
+                <div key={filename} className="flex items-center gap-2 text-xs font-mono text-text-tertiary py-1 border-b border-dark-border last:border-0">
+                  <span className="truncate flex-1">{filename}</span>
+                  <button onClick={() => removeMigration(filename)} className="text-text-tertiary hover:text-red-400 transition-colors flex-shrink-0" title="Remove">
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Step 2: Apply Migration */}
-        <div className="space-y-3">
+        {/* Step 2 */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">02 — Apply</p>
+          <p className="text-xs text-text-secondary">Resets the database and applies all saved migrations.</p>
           <div className="flex items-center gap-2">
-            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-500/20 text-purple-400 text-sm font-bold">
-              2
-            </span>
-            <label className="text-sm font-medium text-text-primary">
-              Apply Migration in Terminal
-            </label>
-          </div>
-
-          <div className="p-4 bg-dark-surface-2 border border-dark-border rounded-lg space-y-2">
-            <p className="text-xs text-text-secondary">
-              Run this command in your terminal to apply all migrations:
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 px-3 py-2 bg-dark-bg text-supabase-lime font-mono text-sm rounded">
-                pnpm supabase:reset
-              </code>
-              <button
-                onClick={() => copyCommand('pnpm supabase:reset')}
-                className="p-2 hover:bg-dark-border rounded transition-colors"
-                title="Copy command"
-              >
-                {copiedCommand ? (
-                  <Check size={16} className="text-green-400" />
-                ) : (
-                  <Copy size={16} className="text-text-tertiary" />
-                )}
-              </button>
-            </div>
-            <p className="text-xs text-text-tertiary">
-              💡 This resets the database and applies all migrations, including
-              your new policy.
-            </p>
+            <code className="flex-1 px-3 py-2 bg-dark-surface border border-dark-border text-supabase-lime font-mono text-sm rounded-md">
+              pnpm supabase:reset
+            </code>
+            <button onClick={() => copyCommand('pnpm supabase:reset')} className="p-2 text-text-tertiary hover:text-text-secondary transition-colors" title="Copy">
+              {copiedCommand ? <Check size={14} className="text-supabase-lime" /> : <Copy size={14} />}
+            </button>
           </div>
         </div>
 
-        {/* Step 3: Test with User Context */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20 text-green-400 text-sm font-bold">
-              3
-            </span>
-            <label className="text-sm font-medium text-text-primary">
-              Test Policy with RLS
-            </label>
-          </div>
-
-          {/* User Selector */}
-          <div>
-            <label className="text-xs text-text-secondary mb-1.5 block">
-              Select Test User
-            </label>
+        {/* Step 3 */}
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-text-tertiary uppercase tracking-wide">03 — Test</p>
+          <div className="flex gap-2">
             <select
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value as TestUserId)}
-              className="w-full px-3 py-2 bg-dark-surface-2 border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-supabase-lime text-sm"
+              className="flex-1 px-3 py-2 bg-dark-surface border border-dark-border rounded-md text-text-primary text-sm focus:outline-none focus:border-supabase-lime"
             >
               {TEST_USERS.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name} ({user.email})
-                </option>
+                <option key={user.id} value={user.id}>{user.name}</option>
               ))}
             </select>
+            <button
+              onClick={runTestQuery}
+              disabled={!testQuery.trim() || testing}
+              className="flex items-center gap-1.5 px-4 py-2 bg-supabase-lime/10 hover:bg-supabase-lime/20 text-supabase-lime rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {testing ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} fill="currentColor" />}
+              {testing ? 'Running…' : 'Run'}
+            </button>
           </div>
-
-          {/* Test Query */}
-          <div>
-            <label className="text-xs text-text-secondary mb-1.5 block">
-              Test Query
-            </label>
-            <textarea
-              value={testQuery}
-              onChange={(e) => setTestQuery(e.target.value)}
-              placeholder="SELECT * FROM documents"
-              className="w-full px-3 py-2 bg-dark-surface-2 border border-dark-border rounded-lg text-text-primary font-mono text-sm focus:outline-none focus:border-supabase-lime resize-none"
-              rows={2}
-            />
-          </div>
-
-          <button
-            onClick={runTestQuery}
-            disabled={!testQuery.trim() || testing}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {testing ? (
-              <>
-                <Loader2 size={16} className="animate-spin" />
-                Running Query...
-              </>
-            ) : (
-              <>
-                <Play size={16} />
-                Run Test Query
-              </>
-            )}
-          </button>
+          <textarea
+            value={testQuery}
+            onChange={(e) => setTestQuery(e.target.value)}
+            placeholder="SELECT * FROM documents"
+            className="w-full px-3 py-2 bg-dark-surface border border-dark-border rounded-md text-text-primary font-mono text-xs focus:outline-none focus:border-supabase-lime resize-none"
+            rows={2}
+          />
         </div>
 
         {/* Results */}
         {results.length > 0 && (
-          <div className="space-y-3">
-            <label className="text-sm font-medium text-text-primary">
-              Query Results
-            </label>
-            <div className="space-y-3">
-              {results.map((result) => (
-                <div
-                  key={result.userId}
-                  className="bg-dark-surface-2 rounded-lg border border-dark-border p-4"
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <User size={16} className="text-supabase-lime" />
-                    <span className="font-medium text-text-primary">
-                      {result.userName}
-                    </span>
-                    <span className="text-xs text-text-tertiary ml-auto">
-                      {result.error ? (
-                        <span className="text-red-400 flex items-center gap-1">
-                          <AlertCircle size={12} />
-                          Error
-                        </span>
-                      ) : (
-                        <span className="text-green-400 flex items-center gap-1">
-                          <CheckCircle2 size={12} />
-                          {result.rowCount}{' '}
-                          {result.rowCount === 1 ? 'row' : 'rows'}
-                        </span>
-                      )}
-                    </span>
-                  </div>
-
-                  {result.error ? (
-                    <div className="text-sm text-red-400 font-mono bg-red-950/20 p-3 rounded border border-red-900/50">
-                      {result.error}
-                    </div>
-                  ) : result.rows.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <pre className="text-xs text-text-secondary font-mono bg-dark-bg p-3 rounded border border-dark-border">
-                        {JSON.stringify(result.rows, null, 2)}
-                      </pre>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-text-tertiary italic p-3 bg-dark-bg rounded border border-dark-border">
-                      No rows returned (RLS may be blocking access)
-                    </p>
-                  )}
+          <div className="space-y-2 pt-1">
+            {results.map((result) => (
+              <div key={result.userId}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-xs font-medium text-text-secondary">{result.userName}</span>
+                  <span className="ml-auto text-xs">
+                    {result.error
+                      ? <span className="text-red-400">error</span>
+                      : <span className="text-supabase-lime">{result.rowCount} {result.rowCount === 1 ? 'row' : 'rows'}</span>
+                    }
+                  </span>
                 </div>
-              ))}
-            </div>
+                {result.error ? (
+                  <p className="text-xs text-red-400 font-mono bg-red-950/20 p-2.5 rounded border border-red-900/40">{result.error}</p>
+                ) : result.rows.length > 0 ? (
+                  <pre className="text-xs text-text-secondary font-mono bg-dark-bg p-2.5 rounded border border-dark-border overflow-x-auto">{JSON.stringify(result.rows, null, 2)}</pre>
+                ) : (
+                  <p className="text-xs text-text-tertiary italic p-2.5 bg-dark-bg rounded border border-dark-border">No rows — this user's policy grants no access here.</p>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Help Text */}
-        <div className="pt-4 border-t border-dark-border">
-          <p className="text-xs text-text-tertiary leading-relaxed">
-            💡 <strong>How it works:</strong> Save your policy as a migration
-            file, apply it with{' '}
-            <code className="px-1 py-0.5 bg-dark-surface-2 rounded">
-              pnpm supabase:reset
-            </code>
-            , then test queries as different users. RLS is automatically
-            enforced by the Supabase client! Remove migrations and reset again
-            to clean up.
-          </p>
-        </div>
       </div>
     </div>
   );

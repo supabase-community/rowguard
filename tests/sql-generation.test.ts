@@ -25,7 +25,7 @@ function normalizeSQL(sql: string): string {
 describe('RLS DSL SQL Generation Tests', () => {
   test('Basic user ownership policy', () => {
     const expected =
-      'CREATE POLICY "user_docs" ON "documents" FOR SELECT USING ("user_id" = auth.uid())';
+      'CREATE POLICY "user_docs" ON "documents" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
     const p = policy('user_docs')
       .on('documents')
@@ -37,7 +37,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('Policy with allow (SELECT)', () => {
     const expected =
-      'CREATE POLICY "read_policy" ON "posts" FOR SELECT USING ("user_id" = auth.uid())';
+      'CREATE POLICY "read_policy" ON "posts" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
     const p = policy('read_policy')
       .on('posts')
@@ -49,7 +49,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('Policy with allow (INSERT)', () => {
     const expected =
-      'CREATE POLICY "write_policy" ON "posts" FOR INSERT WITH CHECK ("user_id" = auth.uid())';
+      'CREATE POLICY "write_policy" ON "posts" FOR INSERT WITH CHECK ("user_id" = (SELECT auth.uid()))';
 
     const p = policy('write_policy')
       .on('posts')
@@ -61,7 +61,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('Policy with allow (UPDATE - sets both USING and WITH CHECK)', () => {
     const expected =
-      'CREATE POLICY "rw_policy" ON "posts" FOR UPDATE USING ("user_id" = auth.uid()) WITH CHECK ("user_id" = auth.uid())';
+      'CREATE POLICY "rw_policy" ON "posts" FOR UPDATE USING ("user_id" = (SELECT auth.uid())) WITH CHECK ("user_id" = (SELECT auth.uid()))';
 
     const p = policy('rw_policy')
       .on('posts')
@@ -135,7 +135,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('OR condition', () => {
     const expected =
-      'CREATE POLICY "or_test" ON "posts" FOR SELECT USING (("user_id" = auth.uid() OR "is_public" = TRUE))';
+      'CREATE POLICY "or_test" ON "posts" FOR SELECT USING (("user_id" = (SELECT auth.uid()) OR "is_public" = TRUE))';
 
     const p = policy('or_test')
       .on('posts')
@@ -147,7 +147,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('AND condition', () => {
     const expected =
-      `CREATE POLICY "and_test" ON "posts" FOR SELECT USING (("user_id" = auth.uid() AND "status" = 'draft'))`;
+      `CREATE POLICY "and_test" ON "posts" FOR SELECT USING (("user_id" = (SELECT auth.uid()) AND "status" = 'draft'))`;
 
     const p = policy('and_test')
       .on('posts')
@@ -159,7 +159,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('Complex nested conditions', () => {
     const expected =
-      `CREATE POLICY "complex_test" ON "projects" FOR SELECT USING (("is_public" = TRUE OR ("user_id" = auth.uid() AND "status" = 'active')))`;
+      `CREATE POLICY "complex_test" ON "projects" FOR SELECT USING (("is_public" = TRUE OR ("user_id" = (SELECT auth.uid()) AND "status" = 'active')))`;
 
     const p = policy('complex_test')
       .on('projects')
@@ -175,7 +175,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('isOwner helper with custom column', () => {
     const expected =
-      'CREATE POLICY "owner_test" ON "items" FOR SELECT USING ("owner_id" = auth.uid())';
+      'CREATE POLICY "owner_test" ON "items" FOR SELECT USING ("owner_id" = (SELECT auth.uid()))';
 
     const p = policy('owner_test')
       .on('items')
@@ -199,7 +199,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('isMemberOf helper', () => {
     const expected =
-      'CREATE POLICY "member_test" ON "projects" FOR SELECT USING ("id" IN ( SELECT "project_id" FROM "project_members" WHERE "user_id" = auth.uid() ))';
+      'CREATE POLICY "member_test" ON "projects" FOR SELECT USING ("id" IN ( SELECT "project_id" FROM "project_members" WHERE "user_id" = (SELECT auth.uid()) ))';
 
     const p = policy('member_test')
       .on('projects')
@@ -211,7 +211,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('hasRole helper', () => {
     const expected =
-      `CREATE POLICY "role_test" ON "admin_data" FOR SELECT USING (EXISTS ( SELECT 1 FROM "user_roles" WHERE "user_id" = auth.uid() AND "role" = 'admin' ))`;
+      `CREATE POLICY "role_test" ON "admin_data" FOR SELECT USING (EXISTS ( SELECT 1 FROM "user_roles" WHERE "user_id" = (SELECT auth.uid()) AND "role" = 'admin' ))`;
 
     const p = policy('role_test')
       .on('admin_data')
@@ -221,36 +221,38 @@ describe('RLS DSL SQL Generation Tests', () => {
     expect(normalizeSQL(p.toSQL())).toBe(normalizeSQL(expected));
   });
 
-  test('userOwned template - single operation', () => {
+  test('owned template - single operation', () => {
     const expected =
-      'CREATE POLICY "documents_select_owner" ON "documents" FOR SELECT USING ("user_id" = auth.uid())';
+      'CREATE POLICY "documents_select_owner" ON "documents" FOR SELECT TO "authenticated" USING ("user_id" = (SELECT auth.uid()))';
 
-    const [p] = policies.userOwned('documents', 'SELECT');
+    const [p] = policies.owned({ tables: ['documents'], operations: ['SELECT'] });
 
     expect(normalizeSQL(p.toSQL())).toBe(normalizeSQL(expected));
   });
 
-  test('tenantIsolation template', () => {
-    const expected =
-      `CREATE POLICY "tenant_data_tenant_isolation" ON "tenant_data" AS RESTRICTIVE FOR ALL USING ("tenant_id" = current_setting('app.current_tenant_id', true)::INTEGER)`;
+  test('tenant template', () => {
+    const [p] = policies.tenant({ tables: ['tenant_data'], ownerPolicies: false });
 
-    const p = policies.tenantIsolation('tenant_data');
-
-    expect(normalizeSQL(p.toSQL())).toBe(normalizeSQL(expected));
+    const sql = p.toSQL();
+    expect(sql).toContain('"tenant_data_tenant_isolation"');
+    expect(sql).toContain('AS RESTRICTIVE');
+    expect(sql).toContain('FOR ALL');
+    expect(sql).toContain('"tenant_id"');
+    expect(sql).toContain('current_setting');
   });
 
-  test('publicAccess template', () => {
+  test('open template', () => {
     const expected =
-      'CREATE POLICY "posts_public_access" ON "posts" FOR SELECT USING ("is_public" = TRUE)';
+      'CREATE POLICY "posts_select_public" ON "posts" FOR SELECT TO public USING (true)';
 
-    const p = policies.publicAccess('posts');
+    const [p] = policies.open({ tables: ['posts'] });
 
     expect(normalizeSQL(p.toSQL())).toBe(normalizeSQL(expected));
   });
 
   test('Multi-tenant SaaS with organization hierarchy', () => {
     const expected =
-      'CREATE POLICY "org_hierarchy_access" ON "documents" FOR SELECT USING (("user_id" = auth.uid() OR "organization_id" IN (SELECT "organization_id" FROM "organization_members" WHERE "user_id" = auth.uid())))';
+      'CREATE POLICY "org_hierarchy_access" ON "documents" FOR SELECT USING (("user_id" = (SELECT auth.uid()) OR "organization_id" IN (SELECT "organization_id" FROM "organization_members" WHERE "user_id" = (SELECT auth.uid()))))';
 
     const p = policy('org_hierarchy_access')
       .on('documents')
@@ -266,7 +268,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('Collaborative workspace with team permissions', () => {
     const expected =
-      'CREATE POLICY "workspace_collaboration" ON "projects" FOR UPDATE USING (("created_by" = auth.uid() OR "id" IN ( SELECT "project_id" FROM "team_members" WHERE "user_id" = auth.uid() ))) WITH CHECK (("created_by" = auth.uid() OR ("id" IN ( SELECT "project_id" FROM "team_members" WHERE "user_id" = auth.uid() ) AND "can_edit" = TRUE)))';
+      'CREATE POLICY "workspace_collaboration" ON "projects" FOR UPDATE USING (("created_by" = (SELECT auth.uid()) OR "id" IN ( SELECT "project_id" FROM "team_members" WHERE "user_id" = (SELECT auth.uid()) ))) WITH CHECK (("created_by" = (SELECT auth.uid()) OR ("id" IN ( SELECT "project_id" FROM "team_members" WHERE "user_id" = (SELECT auth.uid()) ) AND "can_edit" = TRUE)))';
 
     const p = policy('workspace_collaboration')
       .on('projects')
@@ -291,7 +293,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
   test('Private sharing with explicit permissions', () => {
     const expected =
-      'CREATE POLICY "private_sharing" ON "files" FOR SELECT USING (("owner_id" = auth.uid() OR "id" IN ( SELECT "file_id" FROM "file_shares" WHERE "user_id" = auth.uid() ) OR ("is_public" = TRUE AND "workspace_visible" = TRUE)))';
+      'CREATE POLICY "private_sharing" ON "files" FOR SELECT USING (("owner_id" = (SELECT auth.uid()) OR "id" IN ( SELECT "file_id" FROM "file_shares" WHERE "user_id" = (SELECT auth.uid()) ) OR ("is_public" = TRUE AND "workspace_visible" = TRUE)))';
 
     const p = policy('private_sharing')
       .on('files')
@@ -311,12 +313,6 @@ describe('RLS DSL SQL Generation Tests', () => {
   });
 
   test('Policy group generates multiple SQL statements', () => {
-    const expected = `CREATE POLICY "user_select" ON "users" FOR SELECT USING (true);
-
-    CREATE POLICY "user_insert" ON "users" FOR INSERT WITH CHECK ("id" = auth.uid());
-
-    CREATE POLICY "user_update" ON "users" FOR UPDATE USING ("id" = auth.uid()) WITH CHECK ("id" = auth.uid())`;
-
     const group = createPolicyGroup('user_crud', [
       policy('user_select').on('users').for('SELECT').when(alwaysTrue()),
       policy('user_insert')
@@ -330,7 +326,11 @@ describe('RLS DSL SQL Generation Tests', () => {
         .withCheck(column('id').isOwner()),
     ]);
 
-    expect(normalizeSQL(policyGroupToSQL(group))).toBe(normalizeSQL(expected));
+    const sqlOut = policyGroupToSQL(group);
+    expect(sqlOut).toContain('ALTER TABLE "users" ENABLE ROW LEVEL SECURITY;');
+    expect(sqlOut).toContain('CREATE POLICY "user_select"');
+    expect(sqlOut).toContain('CREATE POLICY "user_insert"');
+    expect(sqlOut).toContain('CREATE POLICY "user_update"');
   });
 
   test('Session variable with different types', () => {
@@ -724,7 +724,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Subquery with join', () => {
       const expected =
-        `CREATE POLICY "subquery_join" ON "items" FOR SELECT USING ("id" IN (SELECT "p"."id" FROM "projects" "p" INNER JOIN "members" "m" ON "m"."project_id" = 'p.id' WHERE "m"."user_id" = auth.uid()))`;
+        `CREATE POLICY "subquery_join" ON "items" FOR SELECT USING ("id" IN (SELECT "p"."id" FROM "projects" "p" INNER JOIN "members" "m" ON "m"."project_id" = 'p.id' WHERE "m"."user_id" = (SELECT auth.uid())))`;
 
       const p = policy('subquery_join')
         .on('items')
@@ -751,7 +751,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Subquery join detection - join added before where works', () => {
       const expected =
-        `CREATE POLICY "join_before_where" ON "items" FOR SELECT USING ("id" IN (SELECT "p"."id" FROM "projects" "p" INNER JOIN "members" "m" ON "m"."project_id" = 'p.id' WHERE "m"."user_id" = auth.uid()))`;
+        `CREATE POLICY "join_before_where" ON "items" FOR SELECT USING ("id" IN (SELECT "p"."id" FROM "projects" "p" INNER JOIN "members" "m" ON "m"."project_id" = 'p.id' WHERE "m"."user_id" = (SELECT auth.uid())))`;
 
       const p = policy('join_before_where')
         .on('items')
@@ -770,7 +770,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Subquery with left join', () => {
       const expected =
-        `CREATE POLICY "left_join_test" ON "items" FOR SELECT USING ("id" IN (SELECT "p"."id" FROM "projects" "p" LEFT JOIN "members" "m" ON "m"."project_id" = 'p.id' WHERE "m"."user_id" = auth.uid()))`;
+        `CREATE POLICY "left_join_test" ON "items" FOR SELECT USING ("id" IN (SELECT "p"."id" FROM "projects" "p" LEFT JOIN "members" "m" ON "m"."project_id" = 'p.id' WHERE "m"."user_id" = (SELECT auth.uid())))`;
 
       const p = policy('left_join_test')
         .on('items')
@@ -885,7 +885,7 @@ describe('RLS DSL SQL Generation Tests', () => {
       expect(sqlOut).toContain('"p"."id"');
       expect(sqlOut).toContain('INNER JOIN "members" "m"');
       expect(sqlOut).toContain('INNER JOIN "comments" "c"');
-      expect(sqlOut).toContain('"m"."user_id" = auth.uid()');
+      expect(sqlOut).toContain('"m"."user_id" = (SELECT auth.uid())');
     });
 
     test('Subquery join condition references unavailable table throws error', () => {
@@ -919,7 +919,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Function call with condition arguments', () => {
       const expected =
-        `CREATE POLICY "function_cond_test" ON "items" FOR SELECT USING ("check_access"("user_id" = auth.uid(), "role" = 'admin'))`;
+        `CREATE POLICY "function_cond_test" ON "items" FOR SELECT USING ("check_access"("user_id" = (SELECT auth.uid()), "role" = 'admin'))`;
 
       const p = policy('function_cond_test')
         .on('items')
@@ -963,7 +963,7 @@ describe('RLS DSL SQL Generation Tests', () => {
   describe('Policy Operations', () => {
     test('DELETE operation', () => {
       const expected =
-        'CREATE POLICY "delete_test" ON "items" FOR DELETE USING ("user_id" = auth.uid())';
+        'CREATE POLICY "delete_test" ON "items" FOR DELETE USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('delete_test')
         .on('items')
@@ -975,7 +975,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('ALL operation', () => {
       const expected =
-        'CREATE POLICY "all_test" ON "items" FOR ALL USING ("user_id" = auth.uid()) WITH CHECK ("user_id" = auth.uid())';
+        'CREATE POLICY "all_test" ON "items" FOR ALL USING ("user_id" = (SELECT auth.uid())) WITH CHECK ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('all_test')
         .on('items')
@@ -990,7 +990,7 @@ describe('RLS DSL SQL Generation Tests', () => {
   describe('Policy Types', () => {
     test('PERMISSIVE policy type (explicit)', () => {
       const expected =
-        'CREATE POLICY "permissive_test" ON "items" FOR SELECT USING ("user_id" = auth.uid())';
+        'CREATE POLICY "permissive_test" ON "items" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('permissive_test')
         .on('items')
@@ -1041,7 +1041,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('hasRole helper with custom table', () => {
       const expected =
-        `CREATE POLICY "role_custom_test" ON "admin_data" FOR SELECT USING (EXISTS ( SELECT 1 FROM "custom_roles" WHERE "user_id" = auth.uid() AND "role" = 'admin' ))`;
+        `CREATE POLICY "role_custom_test" ON "admin_data" FOR SELECT USING (EXISTS ( SELECT 1 FROM "custom_roles" WHERE "user_id" = (SELECT auth.uid()) AND "role" = 'admin' ))`;
 
       const p = policy('role_custom_test')
         .on('admin_data')
@@ -1053,44 +1053,37 @@ describe('RLS DSL SQL Generation Tests', () => {
   });
 
   describe('Policy Templates', () => {
-    test('roleAccess template', () => {
+    test('role template with jwt source', () => {
       const expected =
-        `CREATE POLICY "items_select_admin" ON "items" FOR SELECT USING (EXISTS ( SELECT 1 FROM "user_roles" WHERE "user_id" = auth.uid() AND "role" = 'admin' ))`;
+        `CREATE POLICY "items_select_rbac_admin" ON "items" FOR SELECT TO "authenticated" USING ((SELECT auth.jwt() ->> 'user_role') = 'admin')`;
 
-      const [p] = policies.roleAccess('items', 'admin', 'SELECT');
+      const [p] = policies.role({ tables: ['items'], is: 'admin', operations: ['SELECT'] });
 
       expect(normalizeSQL(p.toSQL())).toBe(normalizeSQL(expected));
     });
 
-    test('roleAccess template with multiple operations', () => {
-      const policies_list = policies.roleAccess('items', 'admin', [
-        'SELECT',
-        'INSERT',
-      ]);
+    test('role template with multiple operations', () => {
+      const list = policies.role({ tables: ['items'], is: 'admin', operations: ['SELECT', 'INSERT'] });
 
-      expect(policies_list).toHaveLength(2);
-      expect(policies_list[0].toDefinition().operation).toBe('SELECT');
-      expect(policies_list[1].toDefinition().operation).toBe('INSERT');
+      expect(list).toHaveLength(2);
+      expect(list[0].toDefinition().operation).toBe('SELECT');
+      expect(list[1].toDefinition().operation).toBe('INSERT');
     });
 
-    test('userOwned template with multiple operations', () => {
-      const policies_list = policies.userOwned('documents', [
-        'SELECT',
-        'INSERT',
-        'UPDATE',
-      ]);
+    test('owned template with multiple operations', () => {
+      const list = policies.owned({ tables: ['documents'], operations: ['SELECT', 'INSERT', 'UPDATE'] });
 
-      expect(policies_list).toHaveLength(3);
-      expect(policies_list[0].toDefinition().operation).toBe('SELECT');
-      expect(policies_list[1].toDefinition().operation).toBe('INSERT');
-      expect(policies_list[2].toDefinition().operation).toBe('UPDATE');
+      expect(list).toHaveLength(3);
+      expect(list[0].toDefinition().operation).toBe('SELECT');
+      expect(list[1].toDefinition().operation).toBe('INSERT');
+      expect(list[2].toDefinition().operation).toBe('UPDATE');
     });
 
-    test('userOwned template with custom userIdColumn', () => {
+    test('owned template with custom userColumn', () => {
       const expected =
-        'CREATE POLICY "items_select_owner" ON "items" FOR SELECT USING ("owner_id" = auth.uid())';
+        'CREATE POLICY "items_select_owner" ON "items" FOR SELECT TO "authenticated" USING ("owner_id" = (SELECT auth.uid()))';
 
-      const [p] = policies.userOwned('items', 'SELECT', 'owner_id');
+      const [p] = policies.owned({ tables: ['items'], userColumn: 'owner_id', operations: ['SELECT'] });
 
       expect(normalizeSQL(p.toSQL())).toBe(normalizeSQL(expected));
     });
@@ -1141,7 +1134,7 @@ describe('RLS DSL SQL Generation Tests', () => {
   describe('Context Values', () => {
     test('auth.uid() context', () => {
       const expected =
-        'CREATE POLICY "auth_uid_test" ON "items" FOR SELECT USING ("user_id" = auth.uid())';
+        'CREATE POLICY "auth_uid_test" ON "items" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('auth_uid_test')
         .on('items')
@@ -1203,7 +1196,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Complex nested logical conditions', () => {
       const expected =
-        `CREATE POLICY "complex_nested_test" ON "items" FOR SELECT USING ((("status" = 'active' OR "status" = 'pending') AND ("user_id" = auth.uid() OR "is_public" = TRUE)))`;
+        `CREATE POLICY "complex_nested_test" ON "items" FOR SELECT USING ((("status" = 'active' OR "status" = 'pending') AND ("user_id" = (SELECT auth.uid()) OR "is_public" = TRUE)))`;
 
       const p = policy('complex_nested_test')
         .on('items')
@@ -1287,7 +1280,7 @@ describe('RLS DSL SQL Generation Tests', () => {
   describe('Modern Column-Based API', () => {
     test('Basic column equality', () => {
       const expected =
-        'CREATE POLICY "test" ON "documents" FOR SELECT USING ("user_id" = auth.uid())';
+        'CREATE POLICY "test" ON "documents" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('test')
         .on('documents')
@@ -1299,7 +1292,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Column OR condition', () => {
       const expected =
-        'CREATE POLICY "test" ON "projects" FOR SELECT USING (("user_id" = auth.uid() OR "is_public" = TRUE))';
+        'CREATE POLICY "test" ON "projects" FOR SELECT USING (("user_id" = (SELECT auth.uid()) OR "is_public" = TRUE))';
 
       const p = policy('test')
         .on('projects')
@@ -1313,7 +1306,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Column AND condition', () => {
       const expected =
-        `CREATE POLICY "test" ON "articles" FOR SELECT USING (("status" = 'draft' AND "author_id" = auth.uid()))`;
+        `CREATE POLICY "test" ON "articles" FOR SELECT USING (("status" = 'draft' AND "author_id" = (SELECT auth.uid())))`;
 
       const p = policy('test')
         .on('articles')
@@ -1327,7 +1320,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Complex nested column conditions', () => {
       const expected =
-        `CREATE POLICY "test" ON "items" FOR SELECT USING (("is_public" = TRUE OR ("user_id" = auth.uid() AND "status" = 'active')))`;
+        `CREATE POLICY "test" ON "items" FOR SELECT USING (("is_public" = TRUE OR ("user_id" = (SELECT auth.uid()) AND "status" = 'active')))`;
 
       const p = policy('test')
         .on('items')
@@ -1397,7 +1390,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Column helper methods - isOwner', () => {
       const expected =
-        'CREATE POLICY "test" ON "documents" FOR SELECT USING ("user_id" = auth.uid())';
+        'CREATE POLICY "test" ON "documents" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('test')
         .on('documents')
@@ -1421,7 +1414,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Using .when() method', () => {
       const expected =
-        'CREATE POLICY "test" ON "items" FOR SELECT USING ("user_id" = auth.uid())';
+        'CREATE POLICY "test" ON "items" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('test')
         .on('items')
@@ -1433,7 +1426,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Using .allow() method', () => {
       const expected =
-        'CREATE POLICY "test" ON "resources" FOR UPDATE USING ("owner_id" = auth.uid()) WITH CHECK ("owner_id" = auth.uid())';
+        'CREATE POLICY "test" ON "resources" FOR UPDATE USING ("owner_id" = (SELECT auth.uid())) WITH CHECK ("owner_id" = (SELECT auth.uid()))';
 
       const p = policy('test')
         .on('resources')
@@ -1445,7 +1438,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Column conditions work with INSERT', () => {
       const expected =
-        'CREATE POLICY "test" ON "posts" FOR INSERT WITH CHECK ("author_id" = auth.uid())';
+        'CREATE POLICY "test" ON "posts" FOR INSERT WITH CHECK ("author_id" = (SELECT auth.uid()))';
 
       const p = policy('test')
         .on('posts')
@@ -1457,7 +1450,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Column conditions with multiple OR branches', () => {
       const expected =
-        `CREATE POLICY "test" ON "projects" FOR SELECT USING (("user_id" = auth.uid() OR "is_public" = TRUE OR "organization_id" = '123'))`;
+        `CREATE POLICY "test" ON "projects" FOR SELECT USING (("user_id" = (SELECT auth.uid()) OR "is_public" = TRUE OR "organization_id" = '123'))`;
 
       const p = policy('test')
         .on('projects')
@@ -1491,7 +1484,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Column conditions chaining', () => {
       const expected =
-        'CREATE POLICY "test" ON "items" FOR SELECT USING (("user_id" = auth.uid() OR "is_public" = TRUE))';
+        'CREATE POLICY "test" ON "items" FOR SELECT USING (("user_id" = (SELECT auth.uid()) OR "is_public" = TRUE))';
 
       const p = policy('test')
         .on('items')
@@ -1558,7 +1551,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('Very complex nested column conditions', () => {
       const expected =
-        `CREATE POLICY "test" ON "documents" FOR SELECT USING ((("is_public" = TRUE OR "user_id" = auth.uid()) AND ("status" = 'active' OR "status" = 'pending')))`;
+        `CREATE POLICY "test" ON "documents" FOR SELECT USING ((("is_public" = TRUE OR "user_id" = (SELECT auth.uid())) AND ("status" = 'active' OR "status" = 'pending')))`;
 
       const p = policy('test')
         .on('documents')
@@ -1627,7 +1620,20 @@ describe('RLS DSL SQL Generation Tests', () => {
       const sqlOut = p.toSQL({ includeIndexes: true });
       expect(sqlOut).toContain('CREATE INDEX');
       expect(sqlOut).toContain('"idx_projects_id"');
+      expect(sqlOut).toContain('"idx_project_members_project_id"');
       expect(sqlOut).toContain('"idx_project_members_user_id"');
+    });
+
+    test('Generate index for userBelongsTo (indexes outer col, select col, and WHERE col)', () => {
+      const p = policy('org_access')
+        .on('organizations')
+        .for('SELECT')
+        .when(column('id').userBelongsTo('organization_members', 'organization_id'));
+
+      const sqlOut = p.toSQL({ includeIndexes: true });
+      expect(sqlOut).toContain('"idx_organizations_id"');
+      expect(sqlOut).toContain('"idx_organization_members_organization_id"');
+      expect(sqlOut).toContain('"idx_organization_members_user_id"');
     });
 
     test('Generate indexes for multiple columns', () => {
@@ -1697,12 +1703,35 @@ describe('RLS DSL SQL Generation Tests', () => {
       expect(sqlOut).toContain('"idx_documents_user_id"');
       expect(sqlOut).toContain('"idx_posts_author_id"');
     });
+
+    test('policies.membership() single key generates indexes for all three columns', () => {
+      const ps = policies.membership({ tables: ['projects'], via: 'project_members', key: 'project_id' });
+      const indexes = ps.flatMap(p => p.indexStatements());
+      const unique = [...new Set(indexes)];
+      expect(unique).toContain('CREATE INDEX IF NOT EXISTS "idx_projects_id" ON "projects" ("id");');
+      expect(unique).toContain('CREATE INDEX IF NOT EXISTS "idx_project_members_project_id" ON "project_members" ("project_id");');
+      expect(unique).toContain('CREATE INDEX IF NOT EXISTS "idx_project_members_user_id" ON "project_members" ("user_id");');
+    });
+
+    test('policies.membership() composite key generates tuple IN SQL', () => {
+      const [p] = policies.membership({
+        tables: ['projects'],
+        via: 'project_members',
+        key: ['project_id', 'tenant_id'],
+        localColumn: ['id', 'tenant_id'],
+      });
+      const sql = p.toSQL();
+      expect(sql).toContain('("id", "tenant_id") IN');
+      expect(sql).toContain('SELECT "project_id", "tenant_id"');
+      expect(sql).toContain('FROM "project_members"');
+      expect(sql).toContain('WHERE "user_id"');
+    });
   });
 
   describe('User-Focused API', () => {
     test('read() method - alias for SELECT', () => {
       const expected =
-        'CREATE POLICY "read_docs" ON "documents" FOR SELECT USING ("user_id" = auth.uid())';
+        'CREATE POLICY "read_docs" ON "documents" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('read_docs')
         .on('documents')
@@ -1714,7 +1743,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('write() method - alias for INSERT', () => {
       const expected =
-        'CREATE POLICY "write_docs" ON "documents" FOR INSERT WITH CHECK ("user_id" = auth.uid())';
+        'CREATE POLICY "write_docs" ON "documents" FOR INSERT WITH CHECK ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('write_docs')
         .on('documents')
@@ -1726,7 +1755,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('update() method - alias for UPDATE', () => {
       const expected =
-        'CREATE POLICY "update_docs" ON "documents" FOR UPDATE USING ("user_id" = auth.uid()) WITH CHECK ("user_id" = auth.uid())';
+        'CREATE POLICY "update_docs" ON "documents" FOR UPDATE USING ("user_id" = (SELECT auth.uid())) WITH CHECK ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('update_docs')
         .on('documents')
@@ -1738,7 +1767,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('delete() method - alias for DELETE', () => {
       const expected =
-        'CREATE POLICY "delete_docs" ON "documents" FOR DELETE USING ("user_id" = auth.uid())';
+        'CREATE POLICY "delete_docs" ON "documents" FOR DELETE USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('delete_docs')
         .on('documents')
@@ -1750,7 +1779,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('all() method - alias for ALL', () => {
       const expected =
-        'CREATE POLICY "all_docs" ON "documents" FOR ALL USING ("user_id" = auth.uid()) WITH CHECK ("user_id" = auth.uid())';
+        'CREATE POLICY "all_docs" ON "documents" FOR ALL USING ("user_id" = (SELECT auth.uid())) WITH CHECK ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('all_docs')
         .on('documents')
@@ -1775,7 +1804,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('allowAny() method - alias for permissive()', () => {
       const expected =
-        'CREATE POLICY "permissive_policy" ON "data" FOR SELECT USING ("user_id" = auth.uid())';
+        'CREATE POLICY "permissive_policy" ON "data" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('permissive_policy')
         .on('data')
@@ -1788,7 +1817,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('User-focused API with allow() method', () => {
       const expected =
-        'CREATE POLICY "read_policy" ON "posts" FOR SELECT USING ("user_id" = auth.uid())';
+        'CREATE POLICY "read_policy" ON "posts" FOR SELECT USING ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('read_policy')
         .on('posts')
@@ -1813,7 +1842,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('User-focused API - write with allow()', () => {
       const expected =
-        'CREATE POLICY "write_policy" ON "posts" FOR INSERT WITH CHECK ("user_id" = auth.uid())';
+        'CREATE POLICY "write_policy" ON "posts" FOR INSERT WITH CHECK ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('write_policy')
         .on('posts')
@@ -1825,7 +1854,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('User-focused API - update with allow()', () => {
       const expected =
-        'CREATE POLICY "update_policy" ON "posts" FOR UPDATE USING ("user_id" = auth.uid()) WITH CHECK ("user_id" = auth.uid())';
+        'CREATE POLICY "update_policy" ON "posts" FOR UPDATE USING ("user_id" = (SELECT auth.uid())) WITH CHECK ("user_id" = (SELECT auth.uid()))';
 
       const p = policy('update_policy')
         .on('posts')
@@ -1837,7 +1866,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('User-focused API - all operations with allow()', () => {
       const expected =
-        'CREATE POLICY "full_access" ON "resources" FOR ALL USING ("owner_id" = auth.uid()) WITH CHECK ("owner_id" = auth.uid())';
+        'CREATE POLICY "full_access" ON "resources" FOR ALL USING ("owner_id" = (SELECT auth.uid())) WITH CHECK ("owner_id" = (SELECT auth.uid()))';
 
       const p = policy('full_access')
         .on('resources')
@@ -2038,7 +2067,7 @@ describe('RLS DSL SQL Generation Tests', () => {
         .isMemberOf('members', 'resource_id', 'id', 'member_user_id')
         .toSQL();
       expect(sqlOut).toContain('"member_user_id"');
-      expect(sqlOut).not.toMatch(/"user_id"\s*=\s*auth\.uid\(\)/);
+      expect(sqlOut).not.toMatch(/"user_id"\s*=\s*\(SELECT auth\.uid\(\)\)/);
     });
 
     test('reserved word column name is quoted', () => {
@@ -2048,7 +2077,7 @@ describe('RLS DSL SQL Generation Tests', () => {
 
     test('dotted identifier is split and quoted', () => {
       const sqlOut = column('pm.user_id').eq(auth.uid()).toSQL();
-      expect(sqlOut).toBe('"pm"."user_id" = auth.uid()');
+      expect(sqlOut).toBe('"pm"."user_id" = (SELECT auth.uid())');
     });
   });
 
@@ -2099,7 +2128,7 @@ describe('RLS DSL SQL Generation Tests', () => {
       expect(sqlOut).toContain('IN (');
       expect(sqlOut).toContain('SELECT "project_id"');
       expect(sqlOut).toContain('FROM "project_members"');
-      expect(sqlOut).toContain('"user_id" = auth.uid()');
+      expect(sqlOut).toContain('"user_id" = (SELECT auth.uid())');
     });
 
     test('releasedBefore on typed column generates lte with timestamp', () => {

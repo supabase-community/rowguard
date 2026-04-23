@@ -4,60 +4,49 @@
 
 import { ContextValue, SessionVariableType } from './types';
 
-/**
- * Auth context helper for accessing authentication information
- *
- * @example
- * ```typescript
- * // Users can only see their own documents
- * policy('user_docs')
- *   .on('documents')
- *   .read()
- *   .when(column('user_id').eq(auth.uid()));
- *
- * // Or use the helper method
- * policy('user_docs')
- *   .on('documents')
- *   .read()
- *   .when(column('user_id').isOwner());
- * ```
- */
 export const auth = {
-  /**
-   * Returns current authenticated user ID
-   *
-   * Maps to `auth.uid()` in PostgreSQL (commonly used with Supabase).
-   * This returns the user ID from the JWT token.
-   *
-   * @returns A ContextValue representing the current user's ID
-   *
-   * @example
-   * ```typescript
-   * // Basic user ownership
-   * column('user_id').eq(auth.uid())
-   *
-   * // In a policy
-   * policy('user_documents')
-   *   .on('documents')
-   *   .read()
-   *   .when(column('user_id').eq(auth.uid()));
-   *
-   * // With complex conditions
-   * policy('project_access')
-   *   .on('projects')
-   *   .read()
-   *   .when(
-   *     column('created_by').eq(auth.uid())
-   *       .or(column('is_public').eq(true))
-   *   );
-   * ```
-   */
   uid(): ContextValue {
     return {
       type: 'context',
       contextType: 'auth_uid',
       toSQL(): string {
-        return 'auth.uid()';
+        return '(SELECT auth.uid())';
+      },
+    };
+  },
+
+  jwt(path?: string): ContextValue {
+    if (path && path.startsWith('user_metadata')) {
+      throw new Error(
+        `JWT path 'user_metadata.*' is unsafe for authorization. user_metadata is user-editable. Use 'app_metadata' instead.`
+      );
+    }
+    return {
+      type: 'context',
+      contextType: 'auth_jwt',
+      jwtPath: path,
+      toSQL(): string {
+        if (!path) {
+          return '(SELECT auth.jwt())';
+        }
+        const parts = path.split('.');
+        if (parts.length === 1) {
+          return `(SELECT auth.jwt() ->> '${parts[0]}')`;
+        }
+        const lastPart = parts[parts.length - 1];
+        const middleParts = parts.slice(0, -1);
+        const arrows = middleParts.map((p) => `-> '${p}'`).join(' ');
+        return `(SELECT auth.jwt() ${arrows} ->> '${lastPart}')`;
+      },
+    };
+  },
+
+  role(): ContextValue {
+    return {
+      type: 'context',
+      contextType: 'auth_role',
+      toSQL(): string {
+        return '(SELECT auth.role())';
       },
     };
   },

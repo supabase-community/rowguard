@@ -5,27 +5,25 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](./LICENSE)
 [![pkg.pr.new](https://pkg.pr.new/badge/supabase-community/rowguard)](https://pkg.pr.new/~/supabase-community/rowguard)
 
-A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies with a clean, type-safe API.
+One line per authorization pattern. Maximum performance by default.
 
-> **⚠️ Experimental:** This is an experimental project and not an official Supabase library. Use with caution in production.
->
-> **⚠️ No Performance Evaluation:** This library does not evaluate policy performance. You should use [Supabase Performance Advisor](https://supabase.com/docs/guides/database/performance) to evaluate your RLS policy performance.
+A TypeScript DSL for defining PostgreSQL Row Level Security (RLS) policies — with a template system that covers the most common patterns in a single call, a typed API for compile-time validation, and performance optimizations applied automatically.
+
+> **Warning:** This is an experimental project and not an official Supabase library. Use with caution in production.
 
 ## Interactive Demo
 
 Try the live demo at https://rowguard-demo.vercel.app/
 
-### 🆕 Live Policy Testing (Migration-Based Workflow)
+### Live Policy Testing (Migration-Based Workflow)
 
-The demo now includes **live database testing** using the real Supabase migration workflow:
+The demo includes live database testing using the real Supabase migration workflow:
 
-- 📁 **Save as Migration Files** - Generate timestamped migration files from your policies
-- 🔄 **Apply with Supabase CLI** - Use standard `supabase db reset` to apply migrations
-- 📊 **Browse Database Schema** - View all tables and columns from your local instance
-- 👥 **Test as Different Users** - Sign in as test users to verify RLS enforcement
-- ✅ **Verify in Real-Time** - See exactly which rows each user can access with RLS active
-
-This teaches you the **real Supabase development workflow** - the same way you'll deploy policies to production!
+- **Save as Migration Files** - Generate timestamped migration files from your policies
+- **Apply with Supabase CLI** - Use standard `supabase db reset` to apply migrations
+- **Browse Database Schema** - View all tables and columns from your local instance
+- **Test as Different Users** - Sign in as test users to verify RLS enforcement
+- **Verify in Real-Time** - See exactly which rows each user can access with RLS active
 
 Run the full demo locally with database:
 
@@ -44,17 +42,14 @@ The demo source code is in the [`demo/`](./demo) directory. See [demo/README.md]
 
 ## Features
 
-- **Type-safe schema integration** - Autocomplete and compile-time validation with Supabase-generated types
-- Simple & intuitive fluent API that reads like natural language
-- Natural left-to-right method chaining (no polish notation)
-- Zero dependencies - pure TypeScript, works everywhere
-- Full TypeScript support with intelligent inference
-- Universal - Node.js, Deno, Bun, browsers, edge functions
-- Minimal footprint, tree-shakeable
+- **One-liner templates** — `owned`, `shared`, `membership`, `tenant`, `role`, `immutable`, `admin`, `open`
+- **Type-safe schema integration** — autocomplete and compile-time validation with Supabase-generated types
+- **Performance by default** — `(SELECT auth.uid())` initPlan caching and `TO authenticated` on every policy, automatically
+- **Idempotent SQL** — `DROP POLICY IF EXISTS` before every `CREATE POLICY`; safe to re-run
+- **Zero dependencies** — pure TypeScript, works everywhere
+- **Universal** — Node.js, Deno, Bun, browsers, edge functions
 
 ## Installation
-
-Install via npm:
 
 ```bash
 npm install rowguard
@@ -82,9 +77,9 @@ npm install https://pkg.pr.new/supabase-community/rowguard@{pr-number}
 
 ## Quick Start
 
-### Option 1: Type-Safe Policies (Recommended) 💡
+### Option 1: Type-Safe (Recommended)
 
-Get autocomplete and compile-time validation by generating types from your database schema.
+Generate types from your Supabase schema, then get autocomplete and compile-time validation for every table and column name.
 
 #### Step 1: Generate Database Types
 
@@ -96,51 +91,187 @@ npx supabase gen types typescript --project-id "$PROJECT_REF" > database.types.t
 npx supabase gen types typescript --local > database.types.ts
 ```
 
-#### Step 2: Use Typed API
+#### Step 2: Use the Typed API
 
 ```typescript
-import { createRowguard } from 'rowguard';
-import { Database } from './database.types';
+import { createRowguard, policiesToSQL } from 'rowguard';
+import type { Database } from './database.types';
 
 const rg = createRowguard<Database>();
 
-// ✅ Autocomplete for tables and columns
-const userDocsPolicy = rg
-  .policy('user_documents')
-  .on('documents') // ← IDE shows all table names
-  .read()
-  .when(rg.column('documents', 'user_id').eq(rg.auth.uid()));
-//             ↑ autocomplete    ↑ autocomplete columns
-
-// ❌ Type errors caught at compile time
-// rg.column('documents', 'nonexistent_column')  // TypeScript error
-// rg.column('documents', 'user_id').eq(42)      // Type error: string !== number
-
-console.log(userDocsPolicy.toSQL());
+const sql = policiesToSQL([
+  ...rg.policies.owned({ tables: ['posts', 'comments'] }),
+  ...rg.policies.shared({ tables: ['projects'], publicColumn: 'is_public' }),
+  ...rg.policies.membership({ tables: ['projects'], via: 'project_members', key: 'project_id' }),
+  ...rg.policies.tenant({ tables: ['invoices', 'orders'] }),
+  ...rg.policies.role({ tables: ['admin_logs'], is: 'admin' }),
+  ...rg.policies.open({ tables: ['announcements'] }),
+]);
+// → ALTER TABLE "posts" ENABLE ROW LEVEL SECURITY;
+// → DROP POLICY IF EXISTS ... (idempotent)
+// → CREATE POLICY ...
 ```
-
-**Benefits:**
-
-- ✅ Autocomplete for tables and columns
-- ✅ Catch typos at compile time
-- ✅ Type-safe value comparisons
-- ✅ Safe refactoring
 
 ### Option 2: Without Type Generation
 
-If you don't have a Supabase project or prefer not to generate types:
+```typescript
+import { policies, policiesToSQL } from 'rowguard';
+
+const sql = policiesToSQL([
+  ...policies.owned({ tables: ['posts', 'comments'] }),
+  ...policies.tenant({ tables: ['invoices'] }),
+]);
+```
+
+## Template Reference
+
+| Template | Purpose | Default TO |
+|---|---|---|
+| `owned` | User owns every row (full CRUD) | `authenticated` |
+| `shared` | Owner writes; public can read via flag column | `authenticated` |
+| `membership` | Access via join table (e.g. project members) | `authenticated` |
+| `tenant` | Hard tenant isolation (RESTRICTIVE) + owner CRUD | `authenticated` |
+| `role` | JWT claim or roles table check | `authenticated` |
+| `immutable` | Append-only rows (INSERT only, no UPDATE/DELETE) | `authenticated` |
+| `admin` | Admin bypass (no TO restriction by default) | *(none — all roles)* |
+| `open` | Public read | `public` |
+
+### `owned`
+
+Full CRUD restricted to the row owner. Generates four policies (SELECT, INSERT, UPDATE, DELETE).
+
+```typescript
+policies.owned({ tables: ['posts', 'comments'] })
+policies.owned({ tables: ['posts'], userColumn: 'author_id', operations: ['SELECT', 'UPDATE'] })
+```
+
+### `shared`
+
+Owner has full write access; any user can read rows where a boolean flag column is true.
+
+```typescript
+policies.shared({ tables: ['documents'], publicColumn: 'is_public' })
+```
+
+### `membership`
+
+Access granted through a join table. Useful for team/project membership patterns.
+
+```typescript
+policies.membership({
+  tables: ['projects'],
+  via: 'project_members',
+  key: 'project_id',
+})
+```
+
+### `tenant`
+
+Creates a RESTRICTIVE isolation policy (tenant boundary cannot be bypassed) plus per-operation owner policies.
+
+```typescript
+policies.tenant({ tables: ['invoices', 'orders'] })
+policies.tenant({ tables: ['invoices'], column: 'org_id', ownerPolicies: false })
+```
+
+### `role`
+
+Checks a JWT claim or a roles table. Defaults to checking `auth.jwt() ->> 'user_role'`.
+
+```typescript
+policies.role({ tables: ['admin_logs'], is: 'admin', operations: ['SELECT'] })
+policies.role({ tables: ['reports'], is: ['editor', 'admin'], via: { table: 'user_roles' } })
+```
+
+### `immutable`
+
+Append-only rows. Allows INSERT; blocks UPDATE and DELETE. Optionally adds a SELECT policy for the owner.
+
+```typescript
+policies.immutable({ tables: ['audit_log'], allowRead: true })
+```
+
+### `admin`
+
+Admin bypass — no `TO` role restriction applied by default, so all database roles can match.
+
+```typescript
+policies.admin({ tables: ['admin_settings'], is: 'admin' })
+```
+
+### `open`
+
+Public SELECT access (no authentication required).
+
+```typescript
+policies.open({ tables: ['announcements', 'pricing'] })
+```
+
+## Type Safety
+
+`createRowguard<Database>()` narrows all template configs to your actual schema:
+
+```typescript
+const rg = createRowguard<Database>();
+
+// table names autocomplete; typos are compile errors
+rg.policies.owned({ tables: ['posts'] });
+
+// column names autocomplete; they're validated against the table
+rg.policies.shared({ tables: ['docs'], publicColumn: 'is_public' });
+
+// membership.key autocompletes to columns of the via table specifically
+rg.policies.membership({ tables: ['projects'], via: 'project_members', key: 'project_id' });
+
+// @ts-expect-error — 'nonexistent' is not a column of 'project_members'
+rg.policies.membership({ tables: ['projects'], via: 'project_members', key: 'nonexistent' });
+
+// the fluent builder also narrows to your schema
+rg.policy('user_documents')
+  .on('documents')       // ← autocomplete for all table names
+  .read()
+  .when(rg.column('documents', 'user_id').eq(rg.auth.uid()));
+//              ↑ autocomplete columns of 'documents'
+```
+
+## Performance by Default
+
+Two optimizations are applied automatically to every generated policy:
+
+**`(SELECT auth.uid())` instead of `auth.uid()`** — PostgreSQL evaluates `auth.uid()` once per query (initPlan) instead of once per row. In benchmarks this produces a 94.97% speedup on large tables.
+
+**`TO authenticated` on every policy** — unauthenticated (anon) queries skip policy evaluation entirely rather than evaluating a condition that returns false for every row. Benchmark result: 99.78% speedup for anon traffic.
+
+Both are applied by default. No configuration needed.
+
+## `policiesToSQL` / `applyPolicies`
+
+```typescript
+import { policiesToSQL, applyPolicies, enableRLS } from 'rowguard';
+
+// Generate SQL string (for migration files)
+const sql = policiesToSQL(builders); // idempotent by default
+
+// Apply directly to a database client
+await applyPolicies(builders, client); // runs in a transaction
+
+// Just ENABLE RLS on tables
+enableRLS(['posts', 'comments', 'projects']);
+```
+
+## Policy Builder
+
+For custom policies that go beyond the templates, the fluent builder is available directly:
 
 ```typescript
 import { policy, column, auth, from, session } from 'rowguard';
 
-// Simple user ownership (using user-focused API)
-const userDocsPolicy = policy('user_documents')
+policy('user_documents')
   .on('documents')
   .read()
   .when(column('user_id').eq(auth.uid()));
 
-// Complex conditions with method chaining
-const complexPolicy = policy('project_access')
+policy('project_access')
   .on('projects')
   .read()
   .when(
@@ -150,8 +281,7 @@ const complexPolicy = policy('project_access')
       .or(column('organization_id').eq(session.get('app.org_id', 'uuid')))
   );
 
-// Subqueries
-const memberPolicy = policy('member_access')
+policy('member_access')
   .on('projects')
   .read()
   .when(
@@ -161,100 +291,49 @@ const memberPolicy = policy('member_access')
         .where(column('user_id').eq(auth.uid()))
     )
   );
-
-console.log(userDocsPolicy.toSQL());
 ```
 
-⚠️ **Note**: Without generated types, you won't get autocomplete or compile-time validation.
-
-### Policy Templates (Works with both APIs)
-
-```typescript
-import { policies } from 'rowguard';
-
-const [policy] = policies.userOwned('documents', 'SELECT');
-const tenantPolicy = policies.tenantIsolation('tenant_data');
-const publicPolicy = policies.publicAccess('projects');
-```
-
-## User-Focused vs RLS-Focused API
-
-This library provides two API styles:
-
-**User-Focused API (Recommended)** - Uses intuitive terms like `read()`, `write()`, `update()`, `requireAll()`:
-
-```typescript
-policy('user_docs')
-  .on('documents')
-  .read() // Instead of .for('SELECT')
-  .requireAll() // Instead of .restrictive()
-  .when(column('user_id').isOwner());
-```
-
-**RLS-Focused API** - Uses PostgreSQL RLS terminology like `for('SELECT')`, `restrictive()`:
-
-```typescript
-policy('user_docs')
-  .on('documents')
-  .for('SELECT') // RLS terminology
-  .restrictive() // RLS terminology
-  .when(column('user_id').isOwner());
-```
-
-Both APIs are fully supported and produce identical SQL. The user-focused API is recommended for better readability and developer experience.
-
-## API Reference
-
-### Policy Builder
+### Policy Builder API
 
 ```typescript
 policy(name)
   .on(table)                    // Target table
-  .read()                       // User-focused: allow reading (SELECT)
-  .write()                      // User-focused: allow creating (INSERT)
-  .update()                     // User-focused: allow updating (UPDATE)
-  .delete()                     // User-focused: allow deleting (DELETE)
-  .all()                        // User-focused: allow all operations (ALL)
-  // Or use RLS-focused API:
+  .read()                       // Allow reading (SELECT)
+  .write()                      // Allow creating (INSERT)
+  .update()                     // Allow updating (UPDATE)
+  .delete()                     // Allow deleting (DELETE)
+  .all()                        // Allow all operations (ALL)
   .for(operation)               // SELECT | INSERT | UPDATE | DELETE | ALL
   .to(role?)                    // Optional role restriction
   .when(condition)              // USING clause (read filter)
   .allow(condition)             // Type-safe USING/WITH CHECK based on operation
   .withCheck(condition)         // WITH CHECK clause (write validation)
-  .requireAll()                 // User-focused: all policies must pass (RESTRICTIVE)
-  .allowAny()                   // User-focused: any policy can grant access (PERMISSIVE, default)
-  // Or use RLS-focused API:
+  .requireAll()                 // All policies must pass (RESTRICTIVE)
+  .allowAny()                   // Any policy can grant access (PERMISSIVE, default)
   .restrictive()                // Mark as RESTRICTIVE
   .permissive()                 // Mark as PERMISSIVE (default)
-  .description(text)            // Add documentation
   .toSQL()                      // Generate PostgreSQL statement
 ```
 
 ### Column Conditions
 
 ```typescript
-// Comparisons
 column('status').eq('active');
 column('age').gt(18);
 column('price').lte(100);
 
-// Pattern matching
 column('email').like('%@company.com');
 column('name').ilike('john%');
 
-// Membership
 column('status').in(['active', 'pending']);
 column('tags').contains(['important']);
 
-// Null checks
 column('deleted_at').isNull();
 column('verified_at').isNotNull();
 
-// Helpers
-column('user_id').isOwner(); // eq(auth.uid())
-column('is_public').isPublic(); // eq(true)
+column('user_id').isOwner();       // eq(auth.uid())
+column('is_public').isPublic();    // eq(true)
 
-// Chaining
 column('user_id')
   .eq(auth.uid())
   .or(column('is_public').eq(true))
@@ -272,7 +351,6 @@ column('id').in(
     .where(column('user_id').eq(auth.uid()))
 );
 
-// With joins
 column('id').in(
   from('projects', 'p')
     .select('p.id')
@@ -284,104 +362,9 @@ column('id').in(
 ### Context Functions
 
 ```typescript
-auth.uid(); // Current authenticated user
-session.get(key, type); // Type-safe session variable
-currentUser(); // Current database user
-```
-
-### Policy Templates
-
-```typescript
-policies.userOwned(table, operations?)
-policies.tenantIsolation(table, tenantColumn?, sessionKey?)
-policies.publicAccess(table, visibilityColumn?)
-policies.roleAccess(table, role, operations?)
-```
-
-### Index Generation
-
-Automatically generate indexes for RLS performance optimization:
-
-```typescript
-// User-focused API (recommended)
-const userDocsPolicy = policy('user_documents')
-  .on('documents')
-  .read()
-  .when(column('user_id').eq(auth.uid()));
-
-const sql = userDocsPolicy.toSQL({ includeIndexes: true });
-```
-
-Indexes are created for columns in equality comparisons, IN clauses, and subquery conditions.
-
-## Examples
-
-### User Ownership
-
-```typescript
-// User-focused API (recommended)
-policy('user_documents')
-  .on('documents')
-  .read()
-  .when(column('user_id').eq(auth.uid()));
-
-// Or using .allow() for automatic USING/WITH CHECK handling
-policy('user_documents')
-  .on('documents')
-  .read()
-  .allow(column('user_id').isOwner());
-```
-
-### Multi-Tenant Isolation
-
-```typescript
-// User-focused API (recommended)
-policy('tenant_isolation')
-  .on('tenant_data')
-  .all()
-  .requireAll()
-  .when(column('tenant_id').belongsToTenant());
-```
-
-### Owner or Member Access
-
-```typescript
-// User-focused API (recommended)
-policy('project_access')
-  .on('projects')
-  .read()
-  .when(
-    column('user_id')
-      .eq(auth.uid())
-      .or(
-        column('id').in(
-          from('project_members')
-            .select('project_id')
-            .where(column('user_id').eq(auth.uid()))
-        )
-      )
-  );
-```
-
-### INSERT with Validation
-
-```typescript
-// User-focused API (recommended)
-policy('user_documents_insert')
-  .on('user_documents')
-  .write()
-  .allow(column('user_id').eq(auth.uid()));
-```
-
-### UPDATE with Different Conditions
-
-```typescript
-// User-focused API (recommended)
-policy('user_documents_update')
-  .on('user_documents')
-  .update()
-  .allow(column('user_id').eq(auth.uid()));
-// .allow() automatically sets both USING and WITH CHECK for UPDATE
+auth.uid();                     // Current authenticated user
+session.get(key, type);         // Type-safe session variable
+currentUser();                  // Current database user
 ```
 
 ## Contributing

@@ -10,7 +10,6 @@
 
 import { useState, useEffect } from 'react';
 import {
-  ChevronDown,
   ChevronRight,
   Table,
   Shield,
@@ -201,7 +200,7 @@ export default function SchemaViewer({
 
   if (!isConnected) {
     return (
-      <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border p-6">
+      <div className="border border-dark-border rounded-lg p-4">
         <div className="flex items-center gap-2 mb-4">
           <Table size={20} className="text-text-secondary" />
           <h2 className="font-semibold text-text-primary">Database Schema</h2>
@@ -229,7 +228,7 @@ export default function SchemaViewer({
 
   if (loading) {
     return (
-      <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border p-6">
+      <div className="border border-dark-border rounded-lg p-4">
         <div className="flex items-center gap-2 mb-4">
           <Table size={20} className="text-text-secondary" />
           <h2 className="font-semibold text-text-primary">Database Schema</h2>
@@ -243,82 +242,60 @@ export default function SchemaViewer({
   }
 
   return (
-    <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border overflow-hidden">
-      <div className="bg-slate-800 text-white px-6 py-4 flex items-center gap-2">
-        <Table size={20} />
-        <h2 className="font-semibold">Database Schema</h2>
-        <span className="text-xs text-text-tertiary ml-auto">
-          {tables.length} tables
-        </span>
+    <div className="border border-dark-border rounded-lg overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-dark-border flex items-center gap-2">
+        <Table size={13} className="text-text-tertiary" />
+        <span className="text-xs font-medium text-text-tertiary uppercase tracking-wide">Schema</span>
+        <span className="text-xs text-text-tertiary ml-auto">{tables.length} tables</span>
       </div>
 
-      <div className="p-4 max-h-[600px] overflow-y-auto">
+      <div className="p-3 max-h-[560px] overflow-y-auto">
         {error && (
           <div className="mb-4 p-3 bg-yellow-950/50 border border-yellow-800 rounded-lg text-yellow-400 text-sm">
             {error}
           </div>
         )}
 
-        <div className="space-y-2">
+        <div className="flex items-center gap-1.5 mb-3 text-xs text-text-tertiary">
+          <Shield size={11} className="text-green-400" />
+          <span>RLS enabled</span>
+        </div>
+
+        <div>
           {tables.map((table) => (
-            <div
-              key={table.name}
-              className="border border-dark-border rounded-lg overflow-hidden"
-            >
+            <div key={table.name}>
               <button
                 onClick={() => toggleTable(table.name)}
-                className="w-full flex items-center gap-2 px-3 py-2 bg-dark-surface-2 hover:bg-dark-border transition-colors text-left"
+                className="w-full flex items-center gap-2 px-3 py-2 hover:bg-dark-surface-2 transition-colors text-left"
               >
-                {expandedTables.has(table.name) ? (
-                  <ChevronDown size={16} className="text-text-tertiary" />
-                ) : (
-                  <ChevronRight size={16} className="text-text-tertiary" />
-                )}
-                <Table size={14} className="text-supabase-lime" />
+                <ChevronRight
+                  size={13}
+                  className="text-text-tertiary transition-transform duration-200"
+                  style={{ transform: expandedTables.has(table.name) ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                />
                 <span
                   className="font-mono text-sm text-text-primary hover:text-supabase-lime cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleTableClick(table.name);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); handleTableClick(table.name); }}
                 >
                   {table.name}
                 </span>
-                {table.rls_enabled && (
-                  <Shield
-                    size={12}
-                    className="text-green-400 ml-auto"
-                    aria-label="RLS Enabled"
-                  />
-                )}
               </button>
 
               {expandedTables.has(table.name) && (
-                <div className="bg-dark-surface p-3 border-t border-dark-border">
-                  <div className="space-y-1">
+                <div className="pb-1">
+                  <div>
                     {table.columns.map((column) => (
                       <div
                         key={column.name}
-                        className="flex items-center gap-2 px-2 py-1 hover:bg-dark-surface-2 rounded cursor-pointer text-sm group"
+                        className="flex items-center gap-2 pl-5 pr-2 py-1 hover:bg-dark-surface-2 rounded cursor-pointer group"
                         onClick={() => handleColumnClick(column.name)}
                       >
-                        <span className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                          <span className="w-2 h-2 rounded-full bg-blue-400" />
-                        </span>
-                        <span className="font-mono text-text-primary group-hover:text-supabase-lime flex-1">
+                        <span className="font-mono text-xs text-text-secondary group-hover:text-supabase-lime flex-1">
                           {column.name}
                         </span>
                         <span className="text-xs text-text-tertiary font-mono">
                           {column.type}
                         </span>
-                        {!column.nullable && (
-                          <span
-                            className="text-xs text-amber-400"
-                            title="NOT NULL"
-                          >
-                            !
-                          </span>
-                        )}
                       </div>
                     ))}
                   </div>

@@ -546,7 +546,9 @@ describe('RLS Integration Tests', () => {
         .for('SELECT')
         .when(column('user_id').isOwner());
 
-      const publicPolicy = policies.publicAccess('documents');
+      const publicPolicy = policy('documents_select_public')
+        .on('documents').for('SELECT').to('authenticated')
+        .when(column('is_public').eq(true));
 
       const ownSQL = ownPolicy.toSQL();
       const publicSQL = publicPolicy.toSQL();
@@ -582,7 +584,7 @@ describe('RLS Integration Tests', () => {
         .for('ALL')
         .when(alwaysTrue());
 
-      const restrictivePolicy = policies.tenantIsolation('tenant_data');
+      const [restrictivePolicy] = policies.tenant({ tables: ['tenant_data'], ownerPolicies: false });
 
       const permissiveSQL = permissivePolicy.toSQL();
       const restrictiveSQL = restrictivePolicy.toSQL();
@@ -1961,8 +1963,8 @@ describe('RLS Integration Tests', () => {
   });
 
   describe('Policy Templates', () => {
-    test('policies.userOwned SELECT template', async () => {
-      const [p] = policies.userOwned('documents', 'SELECT');
+    test('policies.owned SELECT template', async () => {
+      const [p] = policies.owned({ tables: ['documents'], operations: ['SELECT'] });
       await adminClient.query(p.toSQL());
 
       const client = await pool.connect();
@@ -1979,8 +1981,8 @@ describe('RLS Integration Tests', () => {
       }
     });
 
-    test('policies.userOwned INSERT template', async () => {
-      const [p] = policies.userOwned('documents', 'INSERT');
+    test('policies.owned INSERT template', async () => {
+      const [p] = policies.owned({ tables: ['documents'], operations: ['INSERT'] });
       await adminClient.query(p.toSQL());
 
       const client = await pool.connect();
@@ -2004,8 +2006,8 @@ describe('RLS Integration Tests', () => {
       }
     });
 
-    test('policies.roleAccess grants access to role holders', async () => {
-      const [p] = policies.roleAccess('documents', 'admin', 'SELECT');
+    test('policies.role grants access to role holders', async () => {
+      const [p] = policies.role({ tables: ['documents'], is: 'admin', operations: ['SELECT'], via: { table: 'user_roles' } });
       await adminClient.query(p.toSQL());
 
       const adminC = await pool.connect();
@@ -2027,6 +2029,116 @@ describe('RLS Integration Tests', () => {
       } finally {
         userC.release();
       }
+    });
+  });
+
+  describe('policies.membership() template', () => {
+    async function applyMemberSelectPolicy(client: typeof adminClient) {
+      await client.query(
+        policy('pm_select').on('project_members').for('SELECT').when(alwaysTrue()).toSQL()
+      );
+    }
+
+    test('grants access only to projects the user is a member of', async () => {
+      await applyMemberSelectPolicy(adminClient);
+      for (const p of policies.membership({ tables: ['projects'], via: 'project_members', key: 'project_id' })) {
+        await adminClient.query(p.toSQL());
+      }
+
+      const u1 = await pool.connect();
+      try {
+        await u1.query('SET ROLE authenticated;');
+        await setCurrentUser(u1, testData.users.user1);
+        const r = await u1.query('SELECT name FROM projects ORDER BY name;');
+        expect(r.rows.map((x: { name: string }) => x.name)).toEqual(['User2 Project']);
+      } finally { u1.release(); }
+
+      const u2 = await pool.connect();
+      try {
+        await u2.query('SET ROLE authenticated;');
+        await setCurrentUser(u2, testData.users.user2);
+        const r = await u2.query('SELECT name FROM projects ORDER BY name;');
+        expect(r.rows.map((x: { name: string }) => x.name)).toEqual(['User1 Project']);
+      } finally { u2.release(); }
+    });
+
+    test('blocks users who are not members', async () => {
+      await applyMemberSelectPolicy(adminClient);
+      for (const p of policies.membership({ tables: ['projects'], via: 'project_members', key: 'project_id' })) {
+        await adminClient.query(p.toSQL());
+      }
+
+      const admin = await pool.connect();
+      try {
+        await admin.query('SET ROLE authenticated;');
+        await setCurrentUser(admin, testData.users.admin);
+        const r = await admin.query('SELECT name FROM projects;');
+        expect(r.rows).toHaveLength(0);
+      } finally { admin.release(); }
+    });
+
+    test('creates indexes for membership columns', async () => {
+      const memberPolicies = policies.membership({ tables: ['projects'], via: 'project_members', key: 'project_id' });
+      for (const p of memberPolicies) {
+        for (const stmt of p.indexStatements()) {
+          await adminClient.query(stmt);
+        }
+      }
+
+      const idxResult = await adminClient.query(`
+        SELECT indexname FROM pg_indexes
+        WHERE schemaname = 'public'
+        AND indexname IN (
+          'idx_projects_id',
+          'idx_project_members_project_id',
+          'idx_project_members_user_id'
+        )
+        ORDER BY indexname;
+      `);
+      expect(idxResult.rows.map((r: { indexname: string }) => r.indexname)).toEqual([
+        'idx_project_members_project_id',
+        'idx_project_members_user_id',
+        'idx_projects_id',
+      ]);
+    });
+
+    test('policiesToSQL includes indexes for membership by default', async () => {
+      const { policiesToSQL } = await import('../src/apply');
+      const memberPolicies = policies.membership({ tables: ['projects'], via: 'project_members', key: 'project_id' });
+      await applyMemberSelectPolicy(adminClient);
+
+      const sql = policiesToSQL(memberPolicies);
+      expect(sql).toContain('-- Create indexes');
+      expect(sql).toContain('"idx_projects_id"');
+      expect(sql).toContain('"idx_project_members_project_id"');
+      expect(sql).toContain('"idx_project_members_user_id"');
+
+      const stmts = sql.split('\n').filter(l => !l.startsWith('--')).join('\n')
+        .split(';').map(s => s.trim()).filter(Boolean);
+      for (const stmt of stmts) {
+        await adminClient.query(stmt + ';');
+      }
+
+      const idxResult = await adminClient.query(`
+        SELECT indexname FROM pg_indexes
+        WHERE schemaname = 'public'
+        AND indexname IN ('idx_projects_id', 'idx_project_members_project_id', 'idx_project_members_user_id')
+        ORDER BY indexname;
+      `);
+      expect(idxResult.rows).toHaveLength(3);
+    });
+
+    test('composite key generates tuple IN SQL', () => {
+      const memberPolicies = policies.membership({
+        tables: ['projects'],
+        via: 'project_members',
+        key: ['project_id', 'tenant_id'],
+        localColumn: ['id', 'tenant_id'],
+      });
+      const sql = memberPolicies[0].toSQL();
+      expect(sql).toContain('("id", "tenant_id") IN');
+      expect(sql).toContain('SELECT "project_id", "tenant_id"');
+      expect(sql).toContain('FROM "project_members"');
     });
   });
 
@@ -2384,7 +2496,7 @@ describe('RLS Integration Tests', () => {
 
     test('PolicyBuilder.validate() succeeds for a valid policy', async () => {
       const p = policy('valid_p').on('documents').for('SELECT').when(column('user_id').isOwner());
-      await expect(p.validate(adminClient)).resolves.not.toThrow();
+      await expect(p.validate(adminClient)).resolves.toBeUndefined();
 
       // validate must NOT have left the policy behind
       const result = await adminClient.query(
@@ -2450,9 +2562,11 @@ describe('RLS Integration Tests', () => {
       // doc2: user1, tenant 1, public
       // doc3: user2, tenant 1, private
       // doc4: user2, tenant 2, public  ← must NOT be visible to tenant-1 users
-      const restrictive = policies.tenantIsolation('documents');
+      const [restrictive] = policies.tenant({ tables: ['documents'], ownerPolicies: false });
       const ownership = policy('docs_own').on('documents').for('SELECT').when(column('user_id').isOwner());
-      const publicAccess = policies.publicAccess('documents');
+      const publicAccess = policy('documents_select_public')
+        .on('documents').for('SELECT').to('authenticated')
+        .when(column('is_public').eq(true));
 
       await adminClient.query(restrictive.toSQL());
       await adminClient.query(ownership.toSQL());
@@ -2716,7 +2830,7 @@ describe('RLS Integration Tests', () => {
       await adminClient.query(
         policy('om_select').on('organization_members').for('SELECT').when(alwaysTrue()).toSQL()
       );
-      const restrictive = policies.tenantIsolation('documents');
+      const [restrictive] = policies.tenant({ tables: ['documents'], ownerPolicies: false });
       const orgAccess = policy('docs_org').on('documents').for('SELECT')
         .when(
           column('organization_id').in(
