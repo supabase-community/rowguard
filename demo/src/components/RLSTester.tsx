@@ -144,9 +144,8 @@ return p.toSQL();`,
 ];
 
 export default function RLSTester() {
-  const allExamples = [...TEMPLATE_EXAMPLES, ...CUSTOM_EXAMPLES];
   const [input, setInput] = useState(EXAMPLE_CODE);
-  const [activeExample, setActiveExample] = useState<typeof allExamples[0]>(TEMPLATE_EXAMPLES[0]);
+  const [activeExample, setActiveExample] = useState<typeof TEMPLATE_EXAMPLES[0] | typeof CUSTOM_EXAMPLES[0]>(TEMPLATE_EXAMPLES[0]);
   const [output, setOutput] = useState('');
   const [outputKey, setOutputKey] = useState(0);
   const [error, setError] = useState('');
@@ -263,7 +262,7 @@ export default function RLSTester() {
     }
   };
 
-  const loadExample = (example: typeof allExamples[0]) => {
+  const loadExample = (example: typeof TEMPLATE_EXAMPLES[0] | typeof CUSTOM_EXAMPLES[0]) => {
     setInput(example.code);
     setActiveExample(example);
     setOutput('');

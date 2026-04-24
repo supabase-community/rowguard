@@ -6,7 +6,6 @@ import { PolicyBuilder, collectUniqueIndexStatements } from './policy-builder';
 import { policies } from './templates';
 import { session } from './context';
 import { SQLGenerationOptions } from './types';
-import { escapeIdentifier } from './sql';
 import { enableRLS } from './apply';
 
 export interface PolicyGroup {

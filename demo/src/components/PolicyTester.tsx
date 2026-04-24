@@ -17,7 +17,6 @@ import {
   Play,
   Trash2,
   User,
-  AlertCircle,
   CheckCircle2,
   Loader2,
   Terminal,
