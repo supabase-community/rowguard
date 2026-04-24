@@ -4,9 +4,9 @@ import {
   Copy,
   CheckCircle,
   AlertCircle,
-  Database,
-  ChevronLeft,
   ChevronRight,
+  ChevronLeft,
+  Columns2,
 } from 'lucide-react';
 import Editor, { Monaco } from '@monaco-editor/react';
 import * as RLS from 'rowguard';
@@ -17,16 +17,79 @@ import PolicyTester from './PolicyTester';
 // Import bundled type definitions from the library's dist folder
 import rlsDslBundledTypes from '../../../dist/bundle.d.ts?raw';
 
-const EXAMPLE_CODE = `const p = policy('user_documents')
-  .on('documents')
-  .read()
-  .when(column('user_id').isOwner());
+const EXAMPLE_CODE = `return policiesToSQL(
+  policies.owned({ tables: ['posts', 'comments'] })
+);`;
 
-return p.toSQL();`;
+const TEMPLATE_EXAMPLES = [
+  {
+    name: 'owned',
+    description: 'Each user can only read and write their own rows. Generates full CRUD policies scoped to user_id.',
+    code: `return policiesToSQL(
+  policies.owned({ tables: ['posts', 'comments'] })
+);`,
+  },
+  {
+    name: 'shared',
+    description: 'Owner has full write access. Rows marked is_public are readable by anyone.',
+    code: `return policiesToSQL(
+  policies.shared({ tables: ['documents'], publicColumn: 'is_public' })
+);`,
+  },
+  {
+    name: 'membership',
+    description: 'Access granted via a join table. Only users with a matching row in the membership table can access.',
+    code: `return policiesToSQL(
+  policies.membership({
+    tables: ['projects'],
+    via: 'project_members',
+    key: 'project_id',
+  })
+);`,
+  },
+  {
+    name: 'tenant',
+    description: 'Hard tenant boundary using a RESTRICTIVE policy — no exceptions, even for public rows. Combined with per-user ownership.',
+    code: `return policiesToSQL(
+  policies.tenant({ tables: ['invoices', 'orders'] })
+);`,
+  },
+  {
+    name: 'role',
+    description: 'Access based on a JWT claim or roles table. Defaults to auth.jwt() ->> \'user_role\'.',
+    code: `return policiesToSQL(
+  policies.role({ tables: ['admin_logs'], is: 'admin', operations: ['SELECT'] })
+);`,
+  },
+  {
+    name: 'immutable',
+    description: 'Rows can be inserted but never updated or deleted. Useful for audit logs and event streams.',
+    code: `return policiesToSQL(
+  policies.immutable({ tables: ['audit_log'], allowRead: true })
+);`,
+  },
+  {
+    name: 'open',
+    description: 'Fully public read access with no authentication required. Defaults to TO public.',
+    code: `return policiesToSQL(
+  policies.open({ tables: ['announcements', 'pricing'] })
+);`,
+  },
+  {
+    name: 'Combined',
+    description: 'Multiple patterns applied together. policiesToSQL deduplicates ENABLE RLS and produces idempotent SQL.',
+    code: `return policiesToSQL([
+  ...policies.owned({ tables: ['posts'] }),
+  ...policies.open({ tables: ['announcements'] }),
+  ...policies.tenant({ tables: ['invoices'] }),
+]);`,
+  },
+];
 
-const EXAMPLES = [
+const CUSTOM_EXAMPLES = [
   {
     name: 'User Ownership',
+    description: 'Fluent builder API for a single SELECT policy. .isOwner() uses (SELECT auth.uid()) for initPlan caching.',
     code: `const p = policy('user_documents')
   .on('documents')
   .read()
@@ -36,6 +99,7 @@ return p.toSQL();`,
   },
   {
     name: 'Multi-Tenant',
+    description: '.requireAll() marks this as RESTRICTIVE — it must pass even when other permissive policies grant access.',
     code: `const p = policy('tenant_isolation')
   .on('tenant_data')
   .all()
@@ -46,6 +110,7 @@ return p.toSQL();`,
   },
   {
     name: 'Owner or Member',
+    description: 'Subquery pattern: grants access if the user owns the row or has a membership entry.',
     code: `const p = policy('project_access')
   .on('projects')
   .read()
@@ -64,6 +129,7 @@ return p.toSQL();`,
   },
   {
     name: 'Complex OR',
+    description: 'Three OR conditions: public row, owner, or org member. session.get() reads a PostgreSQL session variable.',
     code: `const p = policy('project_access')
   .on('projects')
   .read()
@@ -75,105 +141,19 @@ return p.toSQL();`,
 
 return p.toSQL();`,
   },
-  {
-    name: 'With Indexes',
-    code: `const p = policy('user_documents')
-  .on('documents')
-  .read()
-  .when(column('user_id').isOwner());
-
-return p.toSQL({ includeIndexes: true });`,
-  },
-  {
-    name: 'INSERT Validation',
-    code: `const p = policy('user_documents_insert')
-  .on('user_documents')
-  .write()
-  .allow(column('user_id').isOwner());
-
-return p.toSQL();`,
-  },
-  {
-    name: 'UPDATE with Check',
-    code: `const p = policy('user_documents_update')
-  .on('user_documents')
-  .update()
-  .allow(column('user_id').isOwner());
-
-return p.toSQL();`,
-  },
-  {
-    name: 'Template',
-    code: `const [p] = policies.userOwned('documents', 'SELECT');
-
-return p.toSQL();`,
-  },
-  {
-    name: 'DELETE Policy',
-    code: `const p = policy('user_documents_delete')
-  .on('documents')
-  .delete()
-  .when(column('user_id').isOwner());
-
-return p.toSQL();`,
-  },
-  {
-    name: 'Pattern Matching',
-    code: `const p = policy('search_documents')
-  .on('documents')
-  .read()
-  .when(
-    column('title').ilike('%report%')
-      .or(column('category').like('Finance%'))
-  );
-
-return p.toSQL();`,
-  },
-  {
-    name: 'Null Checks',
-    code: `const p = policy('active_documents')
-  .on('documents')
-  .read()
-  .when(
-    column('deleted_at').isNull()
-      .and(column('published_at').isNotNull())
-  );
-
-return p.toSQL();`,
-  },
-  {
-    name: 'Public Access Template',
-    code: `const p = policies.publicAccess('documents');
-
-return p.toSQL();`,
-  },
-  {
-    name: 'Role-Based Access',
-    code: `const [p] = policies.roleAccess('admin_data', 'admin', ['SELECT', 'UPDATE']);
-
-return p.toSQL();`,
-  },
-  {
-    name: 'Helper Methods',
-    code: `const p = policy('document_access')
-  .on('documents')
-  .read()
-  .when(
-    column('user_id').isOwner()
-      .or(column('is_public').isPublic())
-  );
-
-return p.toSQL();`,
-  },
 ];
 
 export default function RLSTester() {
   const [input, setInput] = useState(EXAMPLE_CODE);
+  const [activeExample, setActiveExample] = useState<typeof TEMPLATE_EXAMPLES[0] | typeof CUSTOM_EXAMPLES[0]>(TEMPLATE_EXAMPLES[0]);
   const [output, setOutput] = useState('');
+  const [outputKey, setOutputKey] = useState(0);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
-  const [showSchema, setShowSchema] = useState(true);
+  const [showSchema, setShowSchema] = useState(false);
+  const [showMigration, setShowMigration] = useState(false);
 
   // Test Supabase connection on mount
   useEffect(() => {
@@ -203,6 +183,7 @@ export default function RLSTester() {
         const alwaysTrue: typeof RLS.alwaysTrue;
         const call: typeof RLS.call;
         const policies: typeof RLS.policies;
+        const policiesToSQL: typeof RLS.policiesToSQL;
       }
     `;
 
@@ -231,10 +212,11 @@ export default function RLSTester() {
   };
 
   const executeCode = () => {
-    try {
-      setError('');
-
-      const func = new Function(
+    setGenerating(true);
+    setError('');
+    requestAnimationFrame(() => {
+      try {
+        const func = new Function(
         'policy',
         'column',
         'auth',
@@ -242,6 +224,7 @@ export default function RLSTester() {
         'from',
         'currentUser',
         'policies',
+        'policiesToSQL',
         input
       );
 
@@ -252,18 +235,23 @@ export default function RLSTester() {
         RLS.session,
         RLS.from,
         RLS.currentUser,
-        RLS.policies
+        RLS.policies,
+        RLS.policiesToSQL
       );
 
-      if (typeof result === 'string') {
-        setOutput(result);
-      } else {
-        setError('Code must return a string (use policy.toSQL())');
+        if (typeof result === 'string') {
+          setOutput(result);
+          setOutputKey(k => k + 1);
+        } else {
+          setError('Return a string from your code — call .toSQL() or policiesToSQL(...).');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        setOutput('');
+      } finally {
+        setGenerating(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setOutput('');
-    }
+    });
   };
 
   const copyToClipboard = async () => {
@@ -274,8 +262,9 @@ export default function RLSTester() {
     }
   };
 
-  const loadExample = (code: string) => {
-    setInput(code);
+  const loadExample = (example: typeof TEMPLATE_EXAMPLES[0] | typeof CUSTOM_EXAMPLES[0]) => {
+    setInput(example.code);
+    setActiveExample(example);
     setOutput('');
     setError('');
   };
@@ -288,97 +277,73 @@ export default function RLSTester() {
 
   return (
     <div className="min-h-screen bg-dark-bg">
-      <div className="max-w-screen-2xl mx-auto p-6">
-        <header className="mb-8">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-4xl font-bold text-text-primary">
-                  Rowguard - RLS Policy DSL Tester
-                </h1>
-                {isConnected !== null && (
-                  <div
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
-                      isConnected
-                        ? 'bg-green-950/50 text-green-400 border border-green-800'
-                        : 'bg-yellow-950/50 text-yellow-400 border border-yellow-800'
-                    }`}
-                  >
-                    <Database size={14} />
-                    {isConnected
-                      ? 'Connected to Local Supabase'
-                      : 'Disconnected - SQL Only'}
-                  </div>
-                )}
-              </div>
-              <p className="text-text-secondary">
-                Test and generate PostgreSQL Row Level Security policies with
-                TypeScript
-              </p>
-              {isConnected === false && (
-                <div className="mt-3 p-3 bg-blue-950/30 border border-blue-800/50 rounded-lg">
-                  <p className="text-sm text-blue-300">
-                    💡 <strong>Database features are local-only</strong> - To
-                    test policies with live RLS enforcement:
-                  </p>
-                  <ol className="text-xs text-blue-200 mt-2 ml-4 space-y-1 list-decimal">
-                    <li>
-                      Clone the repo:{' '}
-                      <code className="px-1 py-0.5 bg-blue-900/50 rounded">
-                        git clone
-                        https://github.com/supabase-community/rowguard.git
-                      </code>
-                    </li>
-                    <li>
-                      Run locally:{' '}
-                      <code className="px-1 py-0.5 bg-blue-900/50 rounded">
-                        pnpm demo:dev:full
-                      </code>
-                    </li>
-                    <li>
-                      Get full migration workflow, schema viewer, and policy
-                      testing!
-                    </li>
-                  </ol>
-                  <p className="text-xs text-blue-300 mt-2">
-                    This deployed version generates SQL only (no database
-                    connection possible).
-                  </p>
-                </div>
-              )}
-            </div>
-            <a
-              href="https://supabase-community.github.io/rowguard/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 bg-supabase-lime hover:bg-supabase-lime-hover text-dark-bg rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
-            >
-              View Docs
-            </a>
+      <div className="max-w-screen-2xl mx-auto px-6 pt-5 pb-12">
+
+        {/* Header */}
+        <header className="flex items-center justify-between mb-6 animate-fade-up">
+          <div className="flex items-center gap-3">
+            <span className="text-lg font-semibold tracking-tight text-text-primary">Rowguard</span>
+            {isConnected !== null && (
+              isConnected ? (
+                <span className="flex items-center gap-1.5 text-xs text-text-tertiary">
+                  <span className="w-1.5 h-1.5 rounded-full bg-supabase-lime" />
+                  local
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-amber-400 bg-amber-950/40 border border-amber-900/60">
+                  SQL only — run <code className="font-mono">pnpm demo:dev:full</code> for live testing
+                </span>
+              )
+            )}
           </div>
+          <a
+            href="https://supabase-community.github.io/rowguard/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Docs →
+          </a>
         </header>
 
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-text-primary mb-3">
-            Examples:
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {EXAMPLES.map((example) => (
-              <button
-                key={example.name}
-                onClick={() => loadExample(example.code)}
-                className="px-4 py-2 bg-dark-surface border border-dark-border rounded-lg text-sm text-text-primary hover:bg-dark-surface-2 hover:border-dark-border-strong transition-colors"
-              >
-                {example.name}
-              </button>
-            ))}
-          </div>
+        {/* Examples */}
+        <div className="mb-1 flex flex-wrap items-center gap-1.5 animate-fade-up delay-100">
+          {TEMPLATE_EXAMPLES.map((example) => (
+            <button
+              key={example.name}
+              onClick={() => loadExample(example)}
+              className={`px-3 py-1 rounded text-sm font-medium transition-all duration-150 hover:-translate-y-px active:translate-y-0 ${
+                activeExample?.name === example.name
+                  ? 'text-supabase-lime bg-supabase-lime/15'
+                  : 'text-supabase-lime bg-supabase-lime/8 hover:bg-supabase-lime/15'
+              }`}
+            >
+              {example.name}
+            </button>
+          ))}
+          <span className="w-px h-4 bg-dark-border mx-1" />
+          {CUSTOM_EXAMPLES.slice(0, 4).map((example) => (
+            <button
+              key={example.name}
+              onClick={() => loadExample(example)}
+              className={`px-3 py-1 rounded text-sm transition-all duration-150 hover:-translate-y-px active:translate-y-0 ${
+                activeExample?.name === example.name
+                  ? 'text-text-primary bg-dark-surface-2'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-dark-surface-2'
+              }`}
+            >
+              {example.name}
+            </button>
+          ))}
         </div>
+        <p className="mb-4 text-sm text-text-secondary min-h-[1.25rem] animate-fade-up delay-100">
+          {activeExample?.description}
+        </p>
 
-        <div className="flex gap-6">
+        <div className="flex gap-5">
           {/* Schema Viewer Sidebar */}
           {showSchema && isConnected && (
-            <div className="w-80 flex-shrink-0">
+            <div className="w-72 flex-shrink-0 animate-slide-left">
               <SchemaViewer
                 onInsert={handleSchemaInsert}
                 isConnected={isConnected}
@@ -387,37 +352,44 @@ export default function RLSTester() {
           )}
 
           {/* Main Content */}
-          <div className="flex-1 min-w-0 space-y-6">
-            {/* Editors Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border overflow-hidden flex flex-col">
-                <div className="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {isConnected && (
-                      <button
-                        onClick={() => setShowSchema(!showSchema)}
-                        className="p-1 hover:bg-dark-surface-2 rounded transition-colors"
-                        title={showSchema ? 'Hide schema' : 'Show schema'}
-                      >
-                        {showSchema ? (
-                          <ChevronLeft size={16} />
-                        ) : (
-                          <ChevronRight size={16} />
-                        )}
-                      </button>
-                    )}
-                    <h2 className="font-semibold">TypeScript Input</h2>
-                  </div>
+          <div className="flex-1 min-w-0 space-y-4 animate-fade-up delay-150">
+
+            {/* Generate button row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {isConnected && (
                   <button
-                    onClick={executeCode}
-                    className="flex items-center gap-2 bg-supabase-lime hover:bg-supabase-lime-hover text-dark-bg px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                    onClick={() => setShowSchema(!showSchema)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs text-text-tertiary hover:text-text-secondary hover:bg-dark-surface transition-colors"
+                    title={showSchema ? 'Hide schema' : 'Show schema'}
                   >
-                    <Play size={16} />
-                    Generate
+                    {showSchema ? <ChevronLeft size={13} /> : <Columns2 size={13} />}
+                    {showSchema ? 'hide schema' : 'schema'}
                   </button>
+                )}
+              </div>
+              <button
+                onClick={executeCode}
+                disabled={generating}
+                className="flex items-center gap-2 bg-supabase-lime hover:bg-supabase-lime-hover text-dark-bg px-5 py-2 rounded-md text-sm font-semibold transition-all duration-150 active:scale-[0.96] disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {generating ? (
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-dark-bg/40 border-t-dark-bg animate-spin" />
+                ) : (
+                  <Play size={14} fill="currentColor" />
+                )}
+                {generating ? 'Generating…' : 'Generate SQL'}
+              </button>
+            </div>
+
+            {/* Editors */}
+            <div className={output || error ? 'grid grid-cols-1 lg:grid-cols-2 gap-4' : ''}>
+              <div className="border border-dark-border rounded-lg overflow-hidden flex flex-col">
+                <div className="px-4 py-2.5 border-b border-dark-border flex items-center justify-between">
+                  <span className="text-xs font-medium text-text-tertiary uppercase tracking-wide">TypeScript</span>
                 </div>
                 <Editor
-                  height="600px"
+                  height="560px"
                   defaultLanguage="typescript"
                   theme="vs-dark"
                   value={input}
@@ -425,7 +397,7 @@ export default function RLSTester() {
                   beforeMount={handleEditorWillMount}
                   options={{
                     minimap: { enabled: false },
-                    fontSize: 14,
+                    fontSize: 13,
                     lineNumbers: 'on',
                     scrollBeyondLastLine: false,
                     automaticLayout: true,
@@ -433,190 +405,84 @@ export default function RLSTester() {
                     wordWrap: 'on',
                     quickSuggestions: true,
                     suggestOnTriggerCharacters: true,
+                    padding: { top: 12 },
                   }}
                 />
               </div>
 
-              <div className="bg-dark-surface rounded-xl shadow-sm border border-dark-border overflow-hidden flex flex-col">
-                <div className="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
-                  <h2 className="font-semibold">Generated SQL</h2>
-                  {output && (
-                    <button
-                      onClick={copyToClipboard}
-                      className="flex items-center gap-2 bg-dark-surface-2 hover:bg-dark-border-strong px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                    >
-                      {copied ? (
-                        <>
-                          <CheckCircle size={16} />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={16} />
-                          Copy
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-                {error ? (
-                  <div className="flex-1 p-6 min-h-[600px]">
-                    <div className="flex items-start gap-3 bg-red-950/50 border border-red-800 rounded-lg p-4">
-                      <AlertCircle
-                        className="text-red-400 flex-shrink-0"
-                        size={20}
-                      />
-                      <div>
-                        <h3 className="font-semibold text-red-300 mb-1">
-                          Error
-                        </h3>
-                        <p className="text-red-400 text-sm font-mono">
-                          {error}
-                        </p>
+              {(output || error) && (
+                <div key={outputKey} className="border border-dark-border rounded-lg overflow-hidden flex flex-col animate-slide-right">
+                  <div className="px-4 py-2.5 border-b border-dark-border flex items-center justify-between">
+                    <span className="text-xs font-medium text-text-tertiary uppercase tracking-wide">SQL</span>
+                    {output && (
+                      <button
+                        onClick={copyToClipboard}
+                        className="flex items-center gap-1.5 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+                      >
+                        {copied ? <CheckCircle size={13} className="text-supabase-lime" /> : <Copy size={13} />}
+                        {copied ? 'copied' : 'copy'}
+                      </button>
+                    )}
+                  </div>
+                  {error ? (
+                    <div className="flex-1 p-5 min-h-[560px]">
+                      <div className="flex items-start gap-3 bg-red-950/30 border border-red-900/50 rounded-md p-4">
+                        <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={16} />
+                        <p className="text-red-400 text-sm font-mono leading-relaxed">{error}</p>
                       </div>
                     </div>
-                  </div>
-                ) : output ? (
-                  <Editor
-                    height="600px"
-                    defaultLanguage="sql"
-                    theme="vs-dark"
-                    value={output}
-                    options={{
-                      readOnly: true,
-                      minimap: { enabled: false },
-                      fontSize: 14,
-                      lineNumbers: 'on',
-                      scrollBeyondLastLine: false,
-                      automaticLayout: true,
-                      wordWrap: 'on',
-                    }}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center min-h-[600px]">
-                    <p className="text-text-tertiary text-sm">
-                      Click "Generate" to see the SQL output
-                    </p>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <Editor
+                      height="560px"
+                      defaultLanguage="sql"
+                      theme="vs-dark"
+                      value={output}
+                      options={{
+                        readOnly: true,
+                        minimap: { enabled: false },
+                        fontSize: 13,
+                        lineNumbers: 'on',
+                        scrollBeyondLastLine: false,
+                        automaticLayout: true,
+                        wordWrap: 'on',
+                        padding: { top: 12 },
+                      }}
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Policy Tester */}
+            {/* Migration & Testing accordion */}
             {output && (
-              <PolicyTester
-                generatedSQL={output}
-                isConnected={isConnected ?? false}
-              />
+              <div className="border border-dark-border rounded-lg overflow-hidden animate-fade-in">
+                <button
+                  onClick={() => setShowMigration(!showMigration)}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-dark-surface transition-colors duration-150"
+                >
+                  <ChevronRight
+                    size={14}
+                    className="text-text-tertiary transition-transform duration-300"
+                    style={{ transform: showMigration ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                  />
+                  <span className="text-sm font-medium text-text-secondary">Migration &amp; Testing</span>
+                  {!showMigration && (
+                    <span className="ml-auto text-xs text-text-tertiary">save migration · test with live RLS</span>
+                  )}
+                </button>
+                <div className={`accordion-grid ${showMigration ? 'open' : ''}`}>
+                  <div className="accordion-inner border-t border-dark-border">
+                    <PolicyTester
+                      generatedSQL={output}
+                      isConnected={isConnected ?? false}
+                    />
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>
 
-        <div className="mt-8 bg-dark-surface rounded-xl shadow-sm border border-dark-border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-text-primary">
-              Available Functions
-            </h3>
-            <a
-              href="https://supabase-community.github.io/rowguard/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-supabase-lime hover:text-supabase-lime-hover font-medium"
-            >
-              Full Documentation →
-            </a>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-            <div>
-              <h4 className="font-semibold text-text-primary mb-2">
-                Policy Builder
-              </h4>
-              <code className="text-xs text-text-secondary block">
-                policy(name)
-                <br />
-                .on(table)
-                <br />
-                .read() | .write()
-                <br />
-                .update() | .delete() | .all()
-                <br />
-                .when(condition)
-                <br />
-                .allow(condition)
-                <br />
-                .toSQL()
-              </code>
-            </div>
-            <div>
-              <h4 className="font-semibold text-text-primary mb-2">
-                Conditions
-              </h4>
-              <code className="text-xs text-text-secondary block">
-                column(name).eq(value)
-                <br />
-                .gt() .gte() .lt() .lte()
-                <br />
-                .in() .like() .ilike()
-                <br />
-                .isNull() .isNotNull()
-                <br />
-                .and() .or()
-              </code>
-            </div>
-            <div>
-              <h4 className="font-semibold text-text-primary mb-2">
-                Helper Methods
-              </h4>
-              <code className="text-xs text-text-secondary block">
-                column(name).isOwner()
-                <br />
-                .isPublic()
-                <br />
-                .belongsToTenant()
-                <br />
-                .isMemberOf(table, key)
-              </code>
-            </div>
-            <div>
-              <h4 className="font-semibold text-text-primary mb-2">Context</h4>
-              <code className="text-xs text-text-secondary block">
-                auth.uid()
-                <br />
-                session.get(key, type)
-                <br />
-                currentUser()
-              </code>
-            </div>
-            <div>
-              <h4 className="font-semibold text-text-primary mb-2">
-                Subqueries
-              </h4>
-              <code className="text-xs text-text-secondary block">
-                from(table)
-                <br />
-                .select(cols)
-                <br />
-                .where(condition)
-                <br />
-                .join(table, on)
-              </code>
-            </div>
-            <div>
-              <h4 className="font-semibold text-text-primary mb-2">
-                Templates
-              </h4>
-              <code className="text-xs text-text-secondary block">
-                policies.userOwned()
-                <br />
-                policies.tenantIsolation()
-                <br />
-                policies.publicAccess()
-                <br />
-                policies.roleAccess()
-              </code>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

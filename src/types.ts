@@ -192,9 +192,10 @@ export interface PolicyBuilderState {
  */
 export interface ContextValue extends Condition {
   type: 'context';
-  contextType: 'auth_uid' | 'session' | 'current_user';
+  contextType: 'auth_uid' | 'auth_jwt' | 'auth_role' | 'session' | 'current_user';
   key?: string;
   sessionType?: SessionVariableType;
+  jwtPath?: string;
 }
 
 /**

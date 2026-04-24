@@ -22,7 +22,7 @@ const POSTGRES_ROLE_KEYWORDS = new Set(['public', 'current_user', 'current_role'
 function escapeRole(role: string): string {
   return POSTGRES_ROLE_KEYWORDS.has(role.toLowerCase()) ? role : escapeIdentifier(role);
 }
-import { ConditionChain, column, hasRole } from './column';
+import { ConditionChain } from './column';
 import { SubqueryBuilder } from './subquery-builder';
 
 /**
@@ -106,13 +106,18 @@ function processSubqueryJoin(
 function processSubqueryForIndexing(
   subquery: SubqueryDefinition,
   aliasMap: AliasMap,
-  processCondition: (cond: Condition, table: string) => void
+  processCondition: (cond: Condition, table: string) => void,
+  addColumn: ColumnAddFn
 ): void {
   const mainTableAlias = subquery.alias || subquery.from;
   registerAlias(subquery.alias, subquery.from, aliasMap);
   processSubqueryJoin(subquery, mainTableAlias, aliasMap, processCondition);
   if (subquery.where) {
     processCondition(subquery.where, mainTableAlias);
+  }
+  const selectCols = Array.isArray(subquery.select) ? subquery.select : [subquery.select];
+  for (const col of selectCols) {
+    if (col && col !== '*') addColumn(subquery.from, col);
   }
 }
 
@@ -164,14 +169,14 @@ function processMembershipCondition(
 
   if (mem.value instanceof SubqueryBuilder) {
     const subquery = mem.value.toSubquery();
-    processSubqueryForIndexing(subquery, aliasMap, processCondition);
+    processSubqueryForIndexing(subquery, aliasMap, processCondition, addColumn);
   } else if (
     typeof mem.value === 'object' &&
     mem.value !== null &&
     'from' in mem.value
   ) {
     const subquery = mem.value as SubqueryDefinition;
-    processSubqueryForIndexing(subquery, aliasMap, processCondition);
+    processSubqueryForIndexing(subquery, aliasMap, processCondition, addColumn);
   }
 }
 
@@ -256,7 +261,8 @@ function extractIndexableColumns(
         processSubqueryForIndexing(
           subqueryCond.subquery,
           aliasToTable,
-          processCondition
+          processCondition,
+          addColumn
         );
         break;
       }
@@ -696,23 +702,28 @@ export class PolicyBuilder {
     const policySQL = parts.join(' ');
 
     if (options?.includeIndexes) {
-      const tableColumns = new Map<string, Set<string>>();
-      const mergeColumns = (condition: Condition) => {
-        extractIndexableColumns(condition, def.table).forEach((cols, tbl) => {
-          if (!tableColumns.has(tbl)) tableColumns.set(tbl, new Set());
-          cols.forEach((col) => tableColumns.get(tbl)!.add(col));
-        });
-      };
-
-      if (def.using) mergeColumns(def.using);
-      if (def.withCheck && def.withCheck !== def.using) mergeColumns(def.withCheck);
-
-      if (tableColumns.size > 0) {
-        return `${policySQL};\n\n${generateIndexSQL(tableColumns).join('\n')}`;
-      }
+      const stmts = this.indexStatementsFromDef(def);
+      if (stmts.length > 0) return `${policySQL};\n\n${stmts.join('\n')}`;
     }
 
     return policySQL;
+  }
+
+  indexStatements(): string[] {
+    try { return this.indexStatementsFromDef(this.toDefinition()); } catch { return []; }
+  }
+
+  private indexStatementsFromDef(def: PolicyDefinition): string[] {
+    const tableColumns = new Map<string, Set<string>>();
+    const mergeColumns = (condition: Condition) => {
+      extractIndexableColumns(condition, def.table).forEach((cols, tbl) => {
+        if (!tableColumns.has(tbl)) tableColumns.set(tbl, new Set());
+        cols.forEach((col) => tableColumns.get(tbl)!.add(col));
+      });
+    };
+    if (def.using) mergeColumns(def.using);
+    if (def.withCheck && def.withCheck !== def.using) mergeColumns(def.withCheck);
+    return generateIndexSQL(tableColumns);
   }
 
   /**
@@ -787,166 +798,14 @@ export function policy(name?: string): PolicyBuilder {
   return new PolicyBuilder(name);
 }
 
-/**
- * Policy template helpers for common patterns
- */
-export const policies = {
-  /**
-   * User ownership policy - users can only access their own rows
-   *
-   * @param table Table name
-   * @param operations Operations to allow (default: ALL)
-   * @param userIdColumn Column containing user ID (default: user_id)
-   * @returns Array of PolicyBuilder instances (one per operation)
-   *
-   * @example
-   * ```typescript
-   * // Allow all operations on user's own documents
-   * const [policy] = policies.userOwned('documents');
-   * console.log(policy.toSQL());
-   *
-   * // Only allow SELECT and INSERT
-   * const [selectPolicy, insertPolicy] = policies.userOwned(
-   *   'documents',
-   *   ['SELECT', 'INSERT']
-   * );
-   *
-   * // Custom user ID column
-   * const [policy] = policies.userOwned('posts', 'ALL', 'author_id');
-   * ```
-   */
-  userOwned(
-    table: string,
-    operations: PolicyOperation | PolicyOperation[] = 'ALL',
-    userIdColumn: string = 'user_id'
-  ): PolicyBuilder[] {
-    const ops = Array.isArray(operations) ? operations : [operations];
+export function collectUniqueIndexStatements(builders: PolicyBuilder[]): string[] {
+  const seen = new Set<string>();
+  return builders.flatMap((b) =>
+    b.indexStatements().filter((stmt) => {
+      if (seen.has(stmt)) return false;
+      seen.add(stmt);
+      return true;
+    })
+  );
+}
 
-    return ops.map((op) => {
-      const p = policy(`${table}_${op.toLowerCase()}_owner`).on(table).for(op);
-
-      if (op === 'SELECT' || op === 'DELETE' || op === 'UPDATE' || op === 'ALL') {
-        p.when(column(userIdColumn).isOwner());
-      }
-      if (op === 'INSERT' || op === 'UPDATE' || op === 'ALL') {
-        p.withCheck(column(userIdColumn).isOwner());
-      }
-
-      return p;
-    });
-  },
-
-  /**
-   * Tenant isolation policy - users can only access rows from their tenant
-   *
-   * Creates a RESTRICTIVE policy that enforces tenant isolation across all operations.
-   *
-   * @param table Table name
-   * @param tenantColumn Column containing tenant ID (default: tenant_id)
-   * @param sessionKey Session variable key (default: app.current_tenant_id)
-   * @returns A RESTRICTIVE PolicyBuilder instance
-   *
-   * @example
-   * ```typescript
-   * // Basic tenant isolation
-   * const policy = policies.tenantIsolation('documents');
-   * console.log(policy.toSQL());
-   *
-   * // Custom tenant column and session key
-   * const policy = policies.tenantIsolation(
-   *   'projects',
-   *   'org_id',
-   *   'app.current_org_id'
-   * );
-   *
-   * // Combine with other policies
-   * const tenantPolicy = policies.tenantIsolation('documents');
-   * const [userPolicy] = policies.userOwned('documents', 'SELECT');
-   * // Users see only their docs within their tenant
-   * ```
-   */
-  tenantIsolation(
-    table: string,
-    tenantColumn: string = 'tenant_id',
-    sessionKey: string = 'app.current_tenant_id'
-  ): PolicyBuilder {
-    return policy(`${table}_tenant_isolation`)
-      .on(table)
-      .for('ALL')
-      .restrictive()
-      .when(column(tenantColumn).belongsToTenant(sessionKey));
-  },
-
-  /**
-   * Public access policy - anyone can read public rows
-   *
-   * Creates a SELECT policy that allows reading rows marked as public.
-   *
-   * @param table Table name
-   * @param visibilityColumn Column indicating public visibility (default: is_public)
-   * @returns A PolicyBuilder instance for SELECT operations
-   *
-   * @example
-   * ```typescript
-   * // Allow reading public documents
-   * const policy = policies.publicAccess('documents');
-   * console.log(policy.toSQL());
-   *
-   * // Custom visibility column
-   * const policy = policies.publicAccess('posts', 'published');
-   *
-   * // Combine with ownership policy
-   * const publicPolicy = policies.publicAccess('documents');
-   * const [ownerPolicy] = policies.userOwned('documents', 'SELECT');
-   * // Users can see public docs OR their own docs
-   * ```
-   */
-  publicAccess(
-    table: string,
-    visibilityColumn: string = 'is_public'
-  ): PolicyBuilder {
-    return policy(`${table}_public_access`)
-      .on(table)
-      .for('SELECT')
-      .when(column(visibilityColumn).isPublic());
-  },
-
-  /**
-   * Role-based access policy - only specific roles can access
-   *
-   * Creates policies that grant access to users with a specific role.
-   *
-   * @param table Table name
-   * @param role Role name
-   * @param operations Operations to allow (default: ALL)
-   * @returns Array of PolicyBuilder instances (one per operation)
-   *
-   * @example
-   * ```typescript
-   * // Admins can do everything
-   * const [policy] = policies.roleAccess('documents', 'admin');
-   * console.log(policy.toSQL());
-   *
-   * // Moderators can only read and update
-   * const policies = policies.roleAccess(
-   *   'posts',
-   *   'moderator',
-   *   ['SELECT', 'UPDATE']
-   * );
-   * ```
-   */
-  roleAccess(
-    table: string,
-    role: string,
-    operations: PolicyOperation | PolicyOperation[] = 'ALL'
-  ): PolicyBuilder[] {
-    const ops = Array.isArray(operations) ? operations : [operations];
-
-    return ops.map((op) =>
-      policy(`${table}_${op.toLowerCase()}_${role}`)
-        .on(table)
-        .for(op)
-        .when(hasRole(role))
-    );
-  },
-};

@@ -2,8 +2,11 @@
  * Policy composition utilities
  */
 
-import { PolicyBuilder, policies } from './policy-builder';
+import { PolicyBuilder, collectUniqueIndexStatements } from './policy-builder';
+import { policies } from './templates';
+import { session } from './context';
 import { SQLGenerationOptions } from './types';
+import { enableRLS } from './apply';
 
 export interface PolicyGroup {
   name: string;
@@ -34,7 +37,7 @@ export function createPolicyGroup(
 export function crud(table: string, userIdColumn: string = 'user_id'): PolicyGroup {
   return createPolicyGroup(
     `${table}_crud`,
-    policies.userOwned(table, ['SELECT', 'INSERT', 'UPDATE', 'DELETE'], userIdColumn)
+    policies.owned({ tables: [table], userColumn: userIdColumn, operations: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] })
   );
 }
 
@@ -59,15 +62,15 @@ export function tenantGroup(
 ): PolicyGroup {
   return createPolicyGroup(
     `${table}_tenant_group`,
-    [policies.tenantIsolation(table, tenantColumn, sessionKey)]
+    policies.tenant({ tables: [table], column: tenantColumn, source: session.get(sessionKey, 'integer'), ownerPolicies: false })
   );
 }
 
 /**
  * Generate SQL for a policy group.
  *
- * Pass `{ includeIndexes: true }` to also emit `CREATE INDEX` statements for every
- * column referenced in a policy condition — strongly recommended for production.
+ * Emits `CREATE INDEX IF NOT EXISTS` statements for every column referenced in a
+ * policy condition by default. Pass `{ includeIndexes: false }` to suppress them.
  *
  * Emits warning comments when:
  * - A RESTRICTIVE policy has no companion PERMISSIVE policy in the group
@@ -77,12 +80,37 @@ export function policyGroupToSQL(
   group: PolicyGroup,
   options?: SQLGenerationOptions
 ): string {
+  const opts = { includeIndexes: true, ...options };
   const { restrictiveWarnings, membershipHints } = buildGroupWarnings(group);
   const warnings = [...restrictiveWarnings, ...membershipHints];
-  const body = group.policies.map((p) => p.toSQL(options)).join(';\n\n') + ';';
-  const header = group.description ? `-- ${group.description}\n` : '';
-  const warningBlock = warnings.length > 0 ? warnings.join('\n') + '\n' : '';
-  return `${header}${warningBlock}${body}`;
+
+  const tables = new Set<string>();
+  for (const p of group.policies) {
+    try { tables.add(p.toDefinition().table); } catch { /* incomplete */ }
+  }
+
+  const sections: string[] = [];
+
+  if (group.description) {
+    sections.push(`-- ${group.description}`);
+  }
+
+  if (warnings.length > 0) {
+    sections.push(warnings.join('\n'));
+  }
+
+  sections.push(`-- Enable RLS\n` + enableRLS([...tables]));
+
+  sections.push(`-- Create policies\n` + group.policies.map((p) => p.toSQL() + ';').join('\n'));
+
+  if (opts.includeIndexes) {
+    const indexLines = collectUniqueIndexStatements(group.policies);
+    if (indexLines.length > 0) {
+      sections.push(`-- Create indexes\n` + indexLines.join('\n'));
+    }
+  }
+
+  return sections.join('\n\n');
 }
 
 /**
@@ -123,13 +151,11 @@ export async function applyPolicyGroup(
 }
 
 function groupToStatements(group: PolicyGroup, options?: SQLGenerationOptions): string[] {
-  return group.policies.flatMap((p) =>
-    p.toSQL(options)
-      .split(';')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => s + ';')
-  );
+  return group.policies.flatMap((p) => {
+    const stmts = [p.toSQL()];
+    if (options?.includeIndexes !== false) stmts.push(...p.indexStatements());
+    return stmts;
+  });
 }
 
 function buildGroupWarnings(group: PolicyGroup): {

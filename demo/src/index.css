@@ -2,8 +2,88 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @layer base {
   body {
     @apply bg-dark-bg text-text-primary;
+    font-family: 'Inter var', 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* ─── Keyframes ──────────────────────────────────────────── */
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ─── Animation utilities ────────────────────────────────── */
+
+.animate-fade-up {
+  animation: fade-up 500ms var(--ease-out-expo) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 300ms var(--ease-out-quart) both;
+}
+
+.animate-slide-left {
+  animation: slide-in-left 350ms var(--ease-out-expo) both;
+}
+
+.animate-slide-right {
+  animation: slide-in-right 380ms var(--ease-out-expo) both;
+}
+
+/* Stagger helpers */
+.delay-50  { animation-delay: 50ms; }
+.delay-100 { animation-delay: 100ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-200 { animation-delay: 200ms; }
+
+/* ─── Accordion (grid-template-rows trick) ───────────────── */
+
+.accordion-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 350ms var(--ease-out-quart);
+}
+
+.accordion-grid.open {
+  grid-template-rows: 1fr;
+}
+
+.accordion-inner {
+  overflow: hidden;
+}
+
+/* ─── Reduced motion ─────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

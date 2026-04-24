@@ -22,7 +22,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc && dts-bundle-generator -o dist/bundle.d.ts src/index.ts",
+    "build": "tsc && dts-bundle-generator --project tsconfig.bundle.json -o dist/bundle.d.ts src/index.ts",
     "docs": "typedoc",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
