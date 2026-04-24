@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/supabase-community/rowguard/compare/rowguard-v0.2.0...rowguard-v0.3.0) (2026-04-24)
+
+
+### Features
+
+* fix RLS bugs, add usability helpers, and expand test coverage ([#18](https://github.com/supabase-community/rowguard/issues/18)) ([f54a3ea](https://github.com/supabase-community/rowguard/commit/f54a3ea2d1a1ddfbe9c2704b335a1d61053ff5b2))
+
 ## [0.2.0](https://github.com/supabase-community/rowguard/compare/rowguard-v0.1.1...rowguard-v0.2.0) (2026-02-11)
 
 
