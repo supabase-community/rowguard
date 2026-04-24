@@ -91,7 +91,7 @@
     "typedoc": "^0.28.16",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.55.0",
-    "uuid": "^10.0.0",
+    "uuid": "^14.0.0",
     "vitest": "^4.0.18"
   }
 }
