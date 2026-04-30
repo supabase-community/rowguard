@@ -155,8 +155,14 @@ export default function RLSTester() {
   const [showSchema, setShowSchema] = useState(false);
   const [showMigration, setShowMigration] = useState(false);
 
-  // Test Supabase connection on mount
+  // Test Supabase connection on mount.
+  // Only probe localhost in dev — on the deployed site, fetching 127.0.0.1
+  // triggers Chrome's Local Network Access permission prompt.
   useEffect(() => {
+    if (!import.meta.env.DEV) {
+      setIsConnected(false);
+      return;
+    }
     testConnection().then(setIsConnected);
   }, []);
 

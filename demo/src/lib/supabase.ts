@@ -37,6 +37,8 @@ export const supabase: SupabaseClient<Database> = createClient<Database>(
  * @returns Promise that resolves to true if connected, false otherwise
  */
 export async function testConnection(): Promise<boolean> {
+  // Never reach for localhost from a public origin — triggers Chrome's LNA prompt.
+  if (!import.meta.env.DEV) return false;
   try {
     const { error } = await supabase
       .from('documents')
